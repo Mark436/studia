@@ -29,6 +29,7 @@ import { SettingsSheet } from "@/features/settings/components/SettingsSheet";
 import { useCurrentTime } from "@/lib/devtools/useCurrentTime";
 import { formatAverage } from "@/lib/formatAverage";
 import type { CapsuleNotification } from "@/lib/notifications/capsuleEvents";
+import { REINSCRIPCION_ALERT_MESSAGES } from "@/lib/notifications/reinscripcion";
 import { sendPushNotificationTest } from "@/lib/notifications/testPush";
 import {
   getSetting,
@@ -98,6 +99,8 @@ function AuthenticatedShell() {
     unseenGradeChanges,
     gradeChangeCount,
     adeudoAlertCount,
+    reinscripcionAlertCount,
+    lastReinscripcionAlert,
     lastProgressGain,
     progressAlertCount,
     rememberedUsername,
@@ -213,6 +216,21 @@ function AuthenticatedShell() {
   }, [adeudoAlertCount, showToast, notificationChannel]);
 
   useEffect(() => {
+    if (notificationChannel !== "toast") return;
+    if (reinscripcionAlertCount > 0 && lastReinscripcionAlert !== null) {
+      showToast(
+        REINSCRIPCION_ALERT_MESSAGES[lastReinscripcionAlert],
+        "neutral",
+      );
+    }
+  }, [
+    reinscripcionAlertCount,
+    lastReinscripcionAlert,
+    showToast,
+    notificationChannel,
+  ]);
+
+  useEffect(() => {
     if (
       notificationChannel !== "toast" ||
       progressAlertCount <= 0 ||
@@ -279,6 +297,7 @@ function AuthenticatedShell() {
   const eventCountsRef = useRef({
     grades: 0,
     adeudos: 0,
+    reinscripcion: 0,
     progress: 0,
   });
 
@@ -292,6 +311,15 @@ function AuthenticatedShell() {
         id: `adeudo:${adeudoAlertCount}`,
         title: "Adeudo nuevo",
         detail: "Revisa la alerta en tu pantalla.",
+      });
+    } else if (
+      reinscripcionAlertCount > previous.reinscripcion &&
+      lastReinscripcionAlert !== null
+    ) {
+      setCapsuleNotification({
+        id: `reinscripcion:${reinscripcionAlertCount}`,
+        title: "Reinscripción",
+        detail: REINSCRIPCION_ALERT_MESSAGES[lastReinscripcionAlert],
       });
     } else if (
       progressAlertCount > previous.progress &&
@@ -317,11 +345,14 @@ function AuthenticatedShell() {
     eventCountsRef.current = {
       grades: gradeChangeCount,
       adeudos: adeudoAlertCount,
+      reinscripcion: reinscripcionAlertCount,
       progress: progressAlertCount,
     };
   }, [
     gradeChangeCount,
     adeudoAlertCount,
+    reinscripcionAlertCount,
+    lastReinscripcionAlert,
     progressAlertCount,
     lastProgressGain,
     effectiveAlumno,

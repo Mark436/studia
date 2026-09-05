@@ -5,6 +5,9 @@ export const SETTING_REMEMBERED_USERNAME = "rememberedUsername";
 // Defaults to "false"; the user opts in via Ajustes to enable remembering.
 export const SETTING_REMEMBER_USERNAME = "rememberUsername";
 export const SETTING_ADEUDO_ALERTS_OPT_IN = "adeudoAlertsOptIn";
+// JSON state of the reinscription-date alerts: which stages have fired for
+// which date (see lib/notifications/reinscripcion.ts).
+export const SETTING_REINS_ALERTS_STATE = "reinsAlertsState";
 export const SETTING_GRADES_SEEN = "gradesSeen";
 export const SETTING_LAST_REAUTH_PROMPT_DATE = "lastReAuthPromptDate";
 export const SETTING_LAST_LOGIN_AT = "lastLoginAt";

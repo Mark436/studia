@@ -12,6 +12,11 @@ import {
   notifyCareerProgress,
   progressDelta,
 } from "@/lib/notifications/progress";
+import {
+  notifyNewReinscripcion,
+  type ReinscripcionAlertOutcome,
+  type ReinscripcionAlertKind,
+} from "@/lib/notifications/reinscripcion";
 import { loadAppData, saveAppData } from "@/lib/storage/appDataStore";
 import {
   loadGradeTracking,
@@ -42,6 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [unseenGradeChanges, setUnseenGradeChanges] = useState(false);
   const [gradeChangeCount, setGradeChangeCount] = useState(0);
   const [adeudoAlertCount, setAdeudoAlertCount] = useState(0);
+  const [reinscripcionAlertCount, setReinscripcionAlertCount] = useState(0);
+  const [lastReinscripcionAlert, setLastReinscripcionAlert] = useState<
+    ReinscripcionAlertKind | null
+  >(null);
   const [progressAlertCount, setProgressAlertCount] = useState(0);
   const [lastProgressGain, setLastProgressGain] = useState<number | null>(null);
   const [rememberedUsername, setRememberedUsername] = useState<string | null>(
@@ -118,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasChanges: boolean;
       newAdeudo: boolean;
       progressGain: number;
+      reinscripcionAlert: ReinscripcionAlertOutcome;
     }) => {
       if (result.hasChanges) {
         setUnseenGradeChanges(true);
@@ -130,6 +140,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.progressGain > 0) {
         setLastProgressGain(result.progressGain);
         setProgressAlertCount((count) => count + 1);
+      }
+      if (result.reinscripcionAlert !== "none") {
+        setLastReinscripcionAlert(result.reinscripcionAlert);
+        setReinscripcionAlertCount((count) => count + 1);
       }
     },
     [],
@@ -231,6 +245,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unseenGradeChanges,
       gradeChangeCount,
       adeudoAlertCount,
+      reinscripcionAlertCount,
+      lastReinscripcionAlert,
       lastProgressGain,
       progressAlertCount,
       rememberedUsername,
@@ -250,6 +266,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unseenGradeChanges,
       gradeChangeCount,
       adeudoAlertCount,
+      reinscripcionAlertCount,
+      lastReinscripcionAlert,
       lastProgressGain,
       progressAlertCount,
       rememberedUsername,
@@ -282,6 +300,7 @@ async function persistSession(
   hasChanges: boolean;
   newAdeudo: boolean;
   progressGain: number;
+  reinscripcionAlert: ReinscripcionAlertOutcome;
 }> {
   let hasChanges = false;
   try {
@@ -313,5 +332,9 @@ async function persistSession(
   // Same transition notifyNewAdeudos alerts on: no debt before, debt now.
   const newAdeudo =
     alumno.adeudos.tieneAdeudos && previousAlumno?.adeudos.tieneAdeudos !== true;
-  return { hasChanges, newAdeudo, progressGain };
+  const reinscripcionAlert = await notifyNewReinscripcion(
+    previousAlumno,
+    alumno,
+  );
+  return { hasChanges, newAdeudo, progressGain, reinscripcionAlert };
 }

@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { Alumno, ApiErrorKind, Aviso } from "@/lib/api/client";
+import type { ReinscripcionAlertKind } from "@/lib/notifications/reinscripcion";
 
 export type AuthStatus =
   | "restoring"
@@ -27,6 +28,9 @@ export interface AuthContextValue {
   // zero guarantees app startup and cache restores never trigger them.
   gradeChangeCount: number;
   adeudoAlertCount: number;
+  /** Last reinscription-date alert kind detected by a real fetch, if any. */
+  reinscripcionAlertCount: number;
+  lastReinscripcionAlert: ReinscripcionAlertKind | null;
   /** Career progress percentage-point gain of the latest real fetch. */
   lastProgressGain: number | null;
   progressAlertCount: number;
