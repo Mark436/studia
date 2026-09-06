@@ -405,3 +405,78 @@ Pantalla de preferencias del usuario en el área Alumno, desacoplada de dev mode
 - [ ] La navegación principal funciona en mobile.
 - [ ] Los datos se guardan y restauran localmente sin exponer credenciales.
 - [ ] El flujo offline/online está definido y es visible para el usuario.
+
+## 16. Sugerir horario + búsquedas diarias (rama `test/sugerir-horario`) — PLAN
+
+Objetivo: cuando el instituto publique el calendario, y luego el prehorario de la
+carrera, la app lo detecte sola (búsqueda diaria) para poder sugerir un horario
+antes de la inscripción.
+
+### Logrado en esta rama
+- [x] Descubrir el prehorario de la carrera desde el listado público de
+  `ith.mx/documentos/` ordenado por modificación (`?C=M;O=D`), con desempate
+  por recencia cuando el nombre está cerca (umbral de tokens) y **jamás** un
+  prehorario de otra carrera (`src/lib/prehorario.ts` + tests).
+- [x] Calcular las materias por cursar desde la retícula (`getMateriasPendientes`,
+  estados acreditados = 2/3/4 vía `codigoEstado`).
+- [x] URL canónica del prehorario elegido (`urlPrehorario`).
+- [x] Fecha de modificación de cada archivo del listado (`parseArchivosConFecha`);
+  el botón de prehorario y el nuevo de calendario la validan contra `getNow()`
+  (reloj del modo dev) con una ventana de 7 días.
+- [x] **Calendario oficial = fuente única**: la página
+  `ith.mx/calendario-escolar.html` incrusta el PDF vigente (`<embed src>` /
+  `ul.doc a`). `obtenerCalendarioOficial()` lo extrae y es la única fuente para
+  decidir qué calendario usar: no se selecciona escaneando el listado de
+  documentos por nombre `*calendario*` (se retiró `elegirCalendario`).
+- [x] Prueba de **calendario**: extrae el PDF de la página oficial
+  (`obtenerCalendarioOficial`) y lee sus fechas de inicio de labores con pdfjs;
+  ya no cruza ni imprime candidatos del listado de documentos.
+- [x] **Desempate por tokens distintivos**: se descartan los genéricos
+  (INGENIERIA, LICENCIATURA, EN, E, DE, DEL, LA, EL, UN, UNA, AL), los nombres
+  sin espacio se parten por el punto (`ING.INFORMATICA` → ING + INFORMATICA) y
+  `LIC` se expande a LICENCIATURA (de nuevo genérica). Regresión: «ING. EN
+  AERONÁUTICA» gana su prehorario y no lo roba el de ISC (inflación por
+  EN/INGENIERIA).
+- [x] **Máquina de fases del chequeo diario** (`src/lib/busquedaHorarios.ts`,
+  lógica pura): 15-dic → `buscar-calendario` → `procesar-calendario`
+  (extraer las fechas del PDF, pendiente) → `esperar-labores` (+1 día) →
+  `buscar-prehorario` → `completado`. Mínimo 24 h entre chequeos; el estado se
+  persiste (IndexedDB) y el avance **no depende de una sesión actualizada**.
+- [x] **Harness de prueba en modo dev**: sección «Chequeo diario» con botón
+  **«Validar fecha (+24h)»** que simula el evento aunque la sesión esté
+  desactualizada, input para fijar la fecha de inicio de labores y botón de
+  reinicio; cruza con `getNow()` (reloj del modo dev) y ejecuta la acción de la
+  fase (fetch del calendario oficial / del prehorario, según toque).
+- [x] **Leer el calendario oficial** (pdfjs, import dinámico): `leerFechasInicioLabores`
+  extrae las fechas de «inicio de labores» del PDF. El botón «Probar
+  calendario» las muestra y elige la **próxima futura** (`elegirProximaFechaLabores`).
+  La fase `procesar-calendario` del chequeo ya guarda esa fecha como
+  `fechaInicioLabores` y avanza a `esperar-labores`.
+  - Regla de año: el ciclo inicia en agosto; labores con mes < 8 pertenecen al
+    ciclo siguiente (corrige el «6 de enero 2026/2027» del PDF).
+  - `parseCalendarioOficial` elige el **calendario vigente** (mayor año) cuando
+    la página embebe varios PDFs.
+- [x] **CORS en producción: decisión tomada** — fetch directo sin relay (el
+  usuario descartó el proxy propio); `ith.mx` no manda `Access-Control-Allow-Origin`,
+  así que en producción el fetch del navegador puede bloquearse; en dev lo
+  resuelve el proxy de vite. Revisitar solo si se confirma que la app vivirá en
+  otro origen.
+
+### Pendiente (plan)
+- [ ] **Leer el PDF** del prehorario (extraer grupos/materias/horas). El usuario
+  investigará el enfoque (parsing del PDF) y definirá formato/estructura.
+- [ ] **Generar sugerencias de horario**: combinar materias pendientes con los
+  grupos del prehorario para proponer un horario (criterios por definir:
+  sin choques, bloques, carga por día, etc.).
+
+### Búsquedas diarias (mismo listado `ith.mx/documentos/`)
+- [x] Chequeo diario implementado como fases (15-dic calendario → labores → +1
+  día prehorario → completado) con gate de 24 h y estado persistido; testeable
+  desde el modo dev sin esperar fechas reales.
+- [ ] Disparador "diaria" en producción (p. ej. un check al abrir la app, o el
+  service worker fuera de línea); respetar el modo offline. Una petición por día
+  como máximo por fase.
+- [ ] Cadencia de re-consulta de la página oficial tras el inicio de labores:
+  1 día (recomendado) vs 1 semana — decidir.
+- [ ] **SIG**: del **15 de mayo** en adelante, buscar diario hasta encontrar el
+  archivo "SIG" (confirmar patrón de nombre exacto con el usuario).

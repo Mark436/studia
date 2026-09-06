@@ -10,6 +10,23 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  worker: {
+    format: "es",
+  },
+  server: {
+    host: true,
+    allowedHosts: true,
+    proxy: {
+      "/documentos": {
+        target: "https://ith.mx",
+        changeOrigin: true,
+      },
+      "/calendario-escolar.html": {
+        target: "https://ith.mx",
+        changeOrigin: true,
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),

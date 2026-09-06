@@ -16,6 +16,8 @@ export const SETTING_SCHEDULE_EDITS = "scheduleEdits";
 // First-class, always-on user preferences (see features/settings). Stored as
 // a single JSON blob.
 export const SETTING_USER_SETTINGS = "userSettings";
+// Estado del chequeo diario de búsqueda de calendario/prehorario (JSON).
+export const SETTING_HORARIOS_CHECKS_STATE = "horariosChecksState";
 
 // Settings hold non-sensitive values only. The password must never be stored.
 export async function getSetting(key: string): Promise<string | null> {
