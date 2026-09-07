@@ -4,7 +4,6 @@ import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { Spinner } from "@/components/ui/Spinner";
 import { Toast } from "@/components/ui/Toast";
-import type { CapsuleVariant } from "@/components/ui/Capsule";
 import type { ToastVariant } from "@/components/ui/toastVariants";
 import { DEFAULT_TOAST_DURATION_MS } from "@/components/ui/toastVariants";
 import { applyDevOverrides } from "@/features/devtools/applyDevOverrides";
@@ -17,6 +16,7 @@ import { ReAuthSheet } from "@/features/auth/components/ReAuthSheet";
 import { toDateKey } from "@/features/auth/utils";
 import { GradesPage } from "@/features/grades/GradesPage";
 import { shouldOpenGradesFirst } from "@/features/grades/utils";
+import { NotificationsPage } from "@/features/notifications/NotificationsPage";
 import { getTomorrowFirstMeeting } from "@/features/schedule/capsuleState";
 import { ScheduleStateProvider } from "@/features/schedule/ScheduleStateProvider";
 import { useScheduleState } from "@/features/schedule/scheduleStateContext";
@@ -59,11 +59,9 @@ interface ActiveToast {
 
 /** Persistent context capsule: mounted once for every authenticated tab. */
 function ContextCapsule({
-  variant,
   collapseMs,
   notification,
 }: {
-  variant: CapsuleVariant;
   collapseMs: number;
   notification: CapsuleNotification | null;
 }) {
@@ -85,7 +83,6 @@ function ContextCapsule({
       now={now}
       tomorrowFirst={tomorrowFirst}
       notification={notification}
-      variant={variant}
       autoCollapseMs={collapseMs}
     />
   );
@@ -131,7 +128,6 @@ function AuthenticatedShell() {
   const settingsCtrl = useSettings();
   const {
     notificationChannel,
-    capsuleVariant,
     capsuleCollapseMs,
     longPressDurationMs,
   } = settingsCtrl.settings;
@@ -396,7 +392,6 @@ function AuthenticatedShell() {
         onPullToRefresh={handlePullToRefresh}
         topSlot={
           <ContextCapsule
-            variant={capsuleVariant}
             collapseMs={capsuleCollapseMs}
             notification={
               notificationChannel === "capsule" ? capsuleNotification : null
@@ -417,6 +412,8 @@ function AuthenticatedShell() {
               />
             ) : activeKey === "grades" ? (
               <GradesPage alumno={effectiveAlumno} />
+            ) : activeKey === "notifications" ? (
+              <NotificationsPage alumno={effectiveAlumno} />
             ) : (
               <StudentPage
                 alumno={effectiveAlumno}

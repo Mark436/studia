@@ -5,6 +5,7 @@ import {
   dateForWeekday,
   formatFreeDuration,
   formatMinutes,
+  formatProfessorLabel,
   formatRelativeTime,
   formatTomorrowCapsuleLabel,
   freeMinutesBetween,
@@ -15,6 +16,7 @@ import {
   getVisibleClasses,
   minutesOf,
   parseMinutes,
+  shortenSubjectName,
   wholeHoursUntil,
 } from "./utils";
 
@@ -223,5 +225,43 @@ describe("dateForWeekday", () => {
 
   it("moves forward inside the same week", () => {
     expect(dateForWeekday(monday, 6).getDate()).toBe(29); // Saturday
+  });
+});
+
+describe("shortenSubjectName", () => {
+  it("returns short names unchanged", () => {
+    expect(shortenSubjectName("Inglés")).toBe("Inglés");
+    expect(shortenSubjectName("Contabilidad")).toBe("Contabilidad");
+    expect(shortenSubjectName("Filosofía")).toBe("Filosofía");
+  });
+
+  it("reduces long multi-word names to leading words under the char cap", () => {
+    expect(shortenSubjectName("Fundamentos de Programación")).toBe("Fundamentos");
+    expect(shortenSubjectName("Programación Orientada a Objetos")).toBe("Programación");
+    expect(shortenSubjectName("Ingeniería en Sistemas Computacionales")).toBe("Ingeniería");
+  });
+
+  it("trims whitespace", () => {
+    expect(shortenSubjectName("  Inglés  ")).toBe("Inglés");
+  });
+});
+
+describe("formatProfessorLabel", () => {
+  it("returns the full name when no comma is present", () => {
+    expect(formatProfessorLabel("García López")).toBe("García López");
+  });
+
+  it("extracts surnames before the comma", () => {
+    expect(formatProfessorLabel("García López, Juan")).toBe("García López");
+  });
+
+  it("returns null for empty, blank or masked values", () => {
+    expect(formatProfessorLabel("")).toBeNull();
+    expect(formatProfessorLabel("   ")).toBeNull();
+    expect(formatProfessorLabel("*")).toBeNull();
+  });
+
+  it("trims whitespace around the returned value", () => {
+    expect(formatProfessorLabel("  García,  Juan  ")).toBe("García");
   });
 });

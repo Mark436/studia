@@ -85,14 +85,26 @@ desaparecieron; la barra inferior orienta la sección.
 
 | Estado | Tono | Contenido minimizado |
 | --- | --- | --- |
-| En clase | acento | contador de horas y minutos + salón |
+| En clase | acento | contador de horas y minutos + salón a la derecha; debajo el nombre corto de la materia |
 | Próxima clase | neutro | contador de horas y minutos + salón |
 
 El contador jerarquiza por tamaño (no por color): la hora va grande y bold, la
 unidad "h" fino; los minutos a la mitad del tamaño y la "m" más chiquita aún.
-El salón se muestra crudo ("LB-24"), sin prefijo.
+El salón se muestra crudo ("LB-24"), sin prefijo, en su misma línea y a la
+derecha de los números. La materia debajo usa un nombre resumido que cabe si
+el real es largo (`shortenSubjectName`, umbral 12 caracteres) y nunca envuelve.
 | Por hoy terminaste / Sin clases hoy | neutro | mensaje calmado (+ "mañana HH:MM" si hay clase) |
 | Evento académico | neutro | título del evento + dato clave |
+
+### Expandido de clase (estado "En clase")
+
+El contenido minimizado **es** el contenido expandido: no hay un bloque de
+detalle aparte. Al expandir, el ancla (contador + salón + materia) se **escala
+×1.25 por transform** con el mismo layout — nunca se cambia el `font-size`, así
+la distribución no se re-fluye — y debajo de la materia aparece el profesor
+(solo apellidos si el dato llega en formato "Apellidos, Nombre",
+`formatProfessorLabel`) en su jerarquía de texto secundario. No se muestra
+"Termina a las".
 
 ### Expansión automática (solo eventos importantes)
 
@@ -118,20 +130,25 @@ evento real.
 - Auto-colapso tras `DEFAULT_CAPSULE_COLLAPSE_MS` (1500 ms); tap alterna manual
   siempre y cancela el temporizador. Blur, toque fuera y Escape también
   colapsan; la apertura manual igualmente programa su colapso.
-- Al expandirse se **centra** horizontalmente; el morf anima `left`
-  (0% → 50%) + `xPercent` (0 → -50) con GSAP.
-- El **anchor** (contador + salón) se mantiene montado en la esquina
-  superior-izquierda mientras la tarjeta crece; los detalles (materia,
-  progreso…) aparecen a su derecha con `studia-capsule-in`. El contenido no
-  se reemplaza con una nueva key, así el anchor no se mueve de sitio.
+- Al expandirse se **centra** horizontalmente; el morf viaja con una transform
+  compuesta (`x`) calculada desde la posición inicial, nunca con `left`: el
+  backdrop-blur del glass se mantiene rasterizado y constante durante todo el
+  tween.
+- Colapso y expansión usan **la misma duración siempre**, sin importar qué lo
+  accione (tap, pulso automático, temporizador, Escape, blur o toque fuera):
+  la posición, al ser propiedad del transform, nunca la resetea React a mitad
+  de camino.
+- El **ancla** (contador + salón + materia) se mantiene montado y no cambia de
+  contenido; al expandir se escala con un transform desde `top-left`.
+- La barra de progreso de la clase es un **borde SVG** (rect con
+  `vector-effect: non-scaling-stroke` + `pathLength`), posicionado `inset-0`
+  relativo a la cápsula para que siempre acompañe el borde; el radio del rect
+  anima en sincronía con el `border-radius` de la cápsula.
 
-### Variantes visuales
+### Forma
 
-- **A · Píldora total**: círculo minimizado y estadio al expandir.
-- **B · Morf iOS**: círculo minimizado → tarjeta redondeada 20 px.
-
-Ambas construidas; el toggle vive en modo dev → Interacción. La variante
-por defecto es **B · Morf iOS** (fuera de modo dev y en el config por defecto).
+**Morf iOS**: círculo minimizado → tarjeta redondeada 20 px al expandir.
+Es la única variante; no hay toggle de forma.
 
 ### Radio animable
 
@@ -146,7 +163,7 @@ transiciones CSS para micro-feedback. Sin librerías adicionales.
 
 | Momento | Tratamiento |
 | --- | --- |
-| Morfo de cápsula | GSAP tween geométrico `power3.out` 0.6 s (`left`/`xPercent`/radio); el anchor no se remonta |
+| Morfo de cápsula | GSAP tween geométrico `power3.out` 0.6 s (transform `x` compuesta + radio; el ancla se escala por `transform` sin reemplazarse) |
 | Desliz del indicador activo (barra inferior) | GSAP `translateX` `back.out(1.6)` 0.5 s; posiciona sin tween con `prefers-reduced-motion` |
 | Transición de contenido entre tabs | Salida `power2.in` 0.18 s (fade + subida), entrada `back.out(1.5)` 0.5 s (rise + rebote); líquida sobre un solo contenedor persistente |
 | Números héroe | contador GSAP `power3.out` 0.9 s (`AnimatedNumber`) |

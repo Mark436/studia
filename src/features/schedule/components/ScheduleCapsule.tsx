@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Capsule } from "@/components/ui/Capsule";
-import type { CapsuleVariant } from "@/components/ui/Capsule";
 import type { CapsuleNotification } from "@/lib/notifications/capsuleEvents";
 import type { ResolvedMeeting } from "../types";
 import {
@@ -11,9 +10,11 @@ import {
 import type { UpcomingClassInfo } from "../capsuleState";
 import {
   formatClassroomLabel,
+  formatProfessorLabel,
   formatRelativeTime,
   formatTomorrowCapsuleLabel,
   minutesOf,
+  shortenSubjectName,
 } from "../utils";
 
 interface ScheduleCapsuleProps {
@@ -24,7 +25,6 @@ interface ScheduleCapsuleProps {
   tomorrowFirst?: UpcomingClassInfo | null;
   /** Transient event (new grade, debt…) flashed before returning to classes. */
   notification?: CapsuleNotification | null;
-  variant: CapsuleVariant;
   autoCollapseMs: number;
 }
 
@@ -71,7 +71,6 @@ export function ScheduleCapsule({
   now,
   tomorrowFirst = null,
   notification = null,
-  variant,
   autoCollapseMs,
 }: ScheduleCapsuleProps) {
   const state = buildCapsuleState(meetings, minutesOf(now));
@@ -134,7 +133,6 @@ export function ScheduleCapsule({
   if (flashing && notification) {
     return (
       <Capsule
-        variant={variant}
         autoCollapseMs={effectiveCollapseMs}
         pulseKey={effectivePulse}
         ariaLabel={`${notification.title}${notification.detail ? `: ${notification.detail}` : ""}`}
@@ -190,7 +188,6 @@ export function ScheduleCapsule({
     const hoursOnly = state.kind === "done" && tomorrowLabel !== undefined;
     return (
       <Capsule
-        variant={variant}
         autoCollapseMs={autoCollapseMs}
         pulseKey={effectivePulse}
         ariaLabel={
@@ -241,35 +238,36 @@ export function ScheduleCapsule({
 
   if (state.kind === "in-class") {
     const classroomLabel = formatClassroomLabel(state.classroom);
-    const detailLine =
-      classroomLabel === null
-        ? state.subjectName
-        : `${state.subjectName} · ${classroomLabel}`;
+    const professorLabel = formatProfessorLabel(state.professor);
     return (
       <Capsule
-        variant={variant}
         tone="accent"
+        stacked
         autoCollapseMs={autoCollapseMs}
         pulseKey={effectivePulse}
         progressPercent={state.progressPercent}
         ariaLabel={`En clase: ${state.subjectName}, termina a las ${state.endsLabel}`}
         minimized={
-          <span className="flex flex-col leading-tight">
-            <DurationCounter minutes={state.remainingMinutes} />
-            <span className="max-w-40 truncate text-sm font-semibold text-on-surface">
-              {detailLine}
+          <span className="flex min-w-0 flex-col leading-tight">
+            <span className="flex items-baseline gap-2">
+              <DurationCounter minutes={state.remainingMinutes} />
+              {classroomLabel !== null ? (
+                <span className="text-sm font-semibold text-on-surface">
+                  {classroomLabel}
+                </span>
+              ) : null}
+            </span>
+            <span className="max-w-[10.5rem] truncate text-xs font-medium text-on-surface-variant">
+              {shortenSubjectName(state.subjectName)}
             </span>
           </span>
         }
         expanded={
-          <>
-            <span className="font-display text-base font-bold leading-tight text-on-surface">
-              {state.subjectName}
+          professorLabel !== null ? (
+            <span className="truncate text-[11px] font-medium leading-tight text-on-surface-variant">
+              {professorLabel}
             </span>
-            <p className="text-sm text-on-surface-variant">
-              Termina a las {state.endsLabel}
-            </p>
-          </>
+          ) : null
         }
       />
     );
@@ -283,7 +281,6 @@ export function ScheduleCapsule({
       : `${state.subjectName} · ${classroomLabel}`;
   return (
     <Capsule
-      variant={variant}
       autoCollapseMs={autoCollapseMs}
       pulseKey={effectivePulse}
       ariaLabel={`Siguiente clase: ${state.subjectName} a las ${state.startsLabel}`}

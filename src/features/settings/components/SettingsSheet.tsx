@@ -1,7 +1,6 @@
 import { Slider } from "@/components/ui/Slider";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Switch } from "@/components/ui/Switch";
-import type { CapsuleVariant } from "@/components/ui/Capsule";
 import { useAdeudoAlertsOptIn } from "@/lib/notifications/useAdeudoAlertsOptIn";
 import { useRememberUsername } from "../useRememberUsername";
 import { DEFAULT_CAPSULE_COLLAPSE_MS, DEFAULT_LONG_PRESS_MS } from "../types";
@@ -98,20 +97,6 @@ export function SettingsSheet({
 
           <section className="flex flex-col gap-3">
             <h3 className="text-sm font-semibold text-on-surface">Cápsula</h3>
-            <SegmentedControl<CapsuleVariant>
-              label="Variante"
-              options={[
-                { value: "pill", label: "A · Píldora total" },
-                { value: "morf", label: "B · Morf iOS" },
-              ]}
-              value={settings.settings.capsuleVariant}
-              onChange={(capsuleVariant) =>
-                settings.update((previous) => ({
-                  ...previous,
-                  capsuleVariant,
-                }))
-              }
-            />
             <Slider
               label="Colapso automático"
               min={COLLAPSE_MIN_MS}

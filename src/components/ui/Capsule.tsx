@@ -9,24 +9,25 @@ import {
   CAPSULE_RADIUS_EASE,
 } from "@/lib/motion/eases";
 
-export type CapsuleVariant = "pill" | "morf";
 export type CapsuleTone = "neutral" | "accent";
 
 interface CapsuleProps {
-  /** A: stadium at every size. B: iOS-style pill → rounded-card morph. */
-  variant?: CapsuleVariant;
-  /** Anchor shown while collapsed (and kept at the top-left when expanded).
-      This is the content that does NOT move when the capsule grows. */
+  /** Anchor shown while collapsed (and leading the content when expanded).
+      This is the content that does NOT change between states. */
   minimized: ReactNode;
-  /** Detail content revealed alongside the anchor once expanded. */
-  expanded: ReactNode;
+  /** Detail content revealed on expand. With `stacked` it renders below the
+      scaled anchor; otherwise beside it. */
+  expanded?: ReactNode;
   /** Change this key to trigger one expand pulse (important events only). */
   pulseKey?: string | number;
   /** Delay before an expanded capsule collapses back (ms), manual or pulsed. */
   autoCollapseMs?: number;
-  /** 0–100: when provided, draws a progress fill behind the content that
-      grows across the capsule (used for the in-class countdown). */
+  /** 0–100: when provided, draws a progress ring on the capsule border that
+      grows clockwise from the top-left (used for the in-class countdown). */
   progressPercent?: number;
+  /** "stacked": the anchor replaces the previous right-side detail — it is
+      the only content, simply scaled up, with `expanded` stacked below it. */
+  stacked?: boolean;
   tone?: CapsuleTone;
   ariaLabel?: string;
   className?: string;
@@ -36,30 +37,56 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-const EXPANDED_RADIUS_PX = 20;
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(prefersReducedMotion);
 
-// The context capsule: a floating island sitting at the top-left that morphs to
-// a centered (for the "morf" variant) expanded card. The morph is a GSAP tween
-// over geometry — left / xPercent / borderRadius — not a Flip playback, so the
-// anchor (minimized) stays put while the details (expanded) grow beside it.
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (event: MediaQueryListEvent) => setReduced(event.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  return reduced;
+}
+
+const EXPANDED_RADIUS_PX = 20;
+/** The stacked anchor grows by this factor (transform scale, no font-size
+    change), so the same layout just reads bigger. */
+const ANCHOR_SCALE = 1.25;
+const RING_STROKE_PX = 2;
+
+// The context capsule: a floating island sitting at the top-left that morphs
+// to a centered expanded card. Position travels through a composited `x`
+// transform (never `left`), so the backdrop blur behind the glass panel stays
+// rasterized and constant across the whole tween; only transform + radius
+// animate. The anchor's geometry is owned by GSAP, so collapse animates back
+// with the exact same duration regardless of what triggered it (tap, pulse,
+// timer, Escape, blur or outside press).
 //
-// Expansion is always transient: it ends after autoCollapseMs, on Escape,
-// on focus leaving the island, or on a pointer press outside of it.
+// Expansion is always transient: it ends after autoCollapseMs, on Escape, on
+// focus leaving the island, or on a pointer press outside of it.
 export function Capsule({
-  variant = "morf",
   minimized,
   expanded,
   pulseKey,
   autoCollapseMs = 1500,
   progressPercent,
+  stacked = false,
   tone = "neutral",
   ariaLabel = "Contexto actual",
   className,
 }: CapsuleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [ringSize, setRingSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   const elementRef = useRef<HTMLButtonElement>(null);
+  const ringRectRef = useRef<SVGRectElement>(null);
   const collapseTimerRef = useRef<number | undefined>(undefined);
   const previousPulseRef = useRef(pulseKey);
+  const reducedMotion = usePrefersReducedMotion();
 
   function clearCollapseTimer() {
     if (collapseTimerRef.current !== undefined) {
@@ -142,49 +169,83 @@ export function Capsule({
     }
   }
 
-  // After React commits the new layout, morph the island geometry: move it to
-  // (or from) the centered position and tween the border radius toward its final
-  // concrete value. The "morf" variant settles on a rounded-card radius while
-  // expanded; "pill" keeps the full stadium at every size.
+  // After React commits the new layout, travel to (or from) the centered
+  // position. `x` is a composited transform: the backdrop filter never
+  // re-renders frame-by-frame and every collapse plays the full duration.
   useEffect(() => {
     const element = elementRef.current;
-    if (element === null) return;
-    if (prefersReducedMotion()) return;
+    if (element === null || reducedMotion) return;
 
-    const targetRadius =
-      variant === "morf" && isExpanded
-        ? EXPANDED_RADIUS_PX
-        : element.offsetHeight / 2;
+    const parent = element.parentElement;
+    const targetX =
+      isExpanded && parent !== null
+        ? Math.max(0, (parent.clientWidth - element.offsetWidth) / 2)
+        : 0;
 
     gsap.to(element, {
-      left: isExpanded ? "50%" : "0%",
-      xPercent: isExpanded ? -50 : 0,
-      borderRadius: targetRadius,
+      x: targetX,
       duration: CAPSULE_MORPH_DURATION,
       ease: CAPSULE_MORPH_EASE,
       overwrite: "auto",
     });
-  }, [isExpanded, variant]);
+  }, [isExpanded, reducedMotion]);
 
-  // Separate radius ease so the rounding can settle at its own pace without
-  // lagging the silhouette.
+  // Border-radius morph, tuned not to lag the silhouette. The progress ring
+  // shares the same targets so the rounded corners stay glued to the glass.
   useEffect(() => {
     const element = elementRef.current;
-    if (element === null || prefersReducedMotion()) return;
+    if (element === null || reducedMotion) return;
 
-    const targetRadius =
-      variant === "morf" && isExpanded
-        ? EXPANDED_RADIUS_PX
-        : element.offsetHeight / 2;
-
+    const targetRadius = isExpanded
+      ? EXPANDED_RADIUS_PX
+      : element.offsetHeight / 2;
+    if (ringRectRef.current !== null) {
+      gsap.to(ringRectRef.current, {
+        attr: { rx: targetRadius },
+        duration: CAPSULE_RADIUS_DURATION,
+        ease: CAPSULE_RADIUS_EASE,
+        overwrite: "auto",
+      });
+    }
     gsap.to(element, {
       borderRadius: targetRadius,
       duration: CAPSULE_RADIUS_DURATION,
       ease: CAPSULE_RADIUS_EASE,
       overwrite: "auto",
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- radius targets geometry only.
-  }, [isExpanded, variant]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- geometry targets only.
+  }, [isExpanded, reducedMotion]);
+
+  // Track the capsule box so the ring hugs its border at every size, and for
+  // `prefers-reduced-motion` place the corner radius directly (no tween).
+  useEffect(() => {
+    const element = elementRef.current;
+    if (element === null || progressPercent === undefined) {
+      setRingSize(null);
+      return;
+    }
+
+    const update = () =>
+      setRingSize({ width: element.offsetWidth, height: element.offsetHeight });
+    update();
+
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [progressPercent, isExpanded]);
+
+  const positionClass =
+    reducedMotion && isExpanded ? "left-1/2 -translate-x-1/2" : "left-0";
+
+  const progress = Math.min(Math.max(progressPercent ?? 0, 0), 100);
+  const ringWidth = (ringSize?.width ?? 0) - RING_STROKE_PX;
+  const ringHeight = (ringSize?.height ?? 0) - RING_STROKE_PX;
+  const targetRadius =
+    reducedMotion && ringSize !== null
+      ? isExpanded
+        ? EXPANDED_RADIUS_PX
+        : ringSize.height / 2
+      : 0;
 
   return (
     <button
@@ -195,41 +256,73 @@ export function Capsule({
       onKeyDown={handleKeyDown}
       aria-expanded={isExpanded}
       aria-label={ariaLabel}
-      style={{ left: 0 }}
-      className={`pointer-events-auto absolute z-30 inline-flex select-none text-left transition-opacity duration-150 ease-out active:opacity-80 ${
+      className={`pointer-events-auto absolute z-30 select-none text-left ${positionClass} ${
         isExpanded
-          ? `${variant === "morf" ? "rounded-[20px]" : "rounded-full"} max-w-[calc(100vw-1.5rem)] items-start p-4`
-          : "min-h-12 items-center rounded-full px-4"
-      } ${
+          ? "max-w-[calc(100vw-1.5rem)] rounded-[20px] p-4"
+          : "min-h-12 rounded-full px-4"
+      } transition-opacity duration-150 ease-out active:opacity-80 ${
         tone === "accent" ? "glass-panel-accent" : "glass-panel"
       } ${className ?? ""}`}
     >
       {progressPercent !== undefined ? (
-        <span
+        <svg
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] border-2 border-[var(--studia-cobalto)]"
-          style={{
-            mask: `linear-gradient(to right, black ${Math.min(Math.max(progressPercent, 0), 100)}%, transparent ${Math.min(Math.max(progressPercent, 0), 100)}%)`,
-          }}
-        />
+          className="pointer-events-none absolute inset-0 h-full w-full"
+        >
+          {ringWidth > 0 && ringHeight > 0 ? (
+            <rect
+              ref={ringRectRef}
+              x={1}
+              y={1}
+              width={ringWidth}
+              height={ringHeight}
+              rx={targetRadius}
+              fill="none"
+              stroke="var(--studia-cobalto)"
+              strokeWidth={RING_STROKE_PX}
+              vectorEffect="non-scaling-stroke"
+              pathLength={100}
+              strokeDasharray={`${progress} ${100 - progress}`}
+            />
+          ) : null}
+        </svg>
       ) : null}
+
       <div
         className={
           isExpanded
-            ? "flex items-start gap-3"
+            ? stacked
+              ? "min-w-0"
+              : "flex items-start gap-3"
             : "flex min-w-0 items-center gap-1.5"
         }
       >
-        <div className={isExpanded ? "shrink-0" : "min-w-0"}>{minimized}</div>
-
-        {isExpanded ? (
+        {isExpanded && stacked ? (
           <div
-            className="min-w-0 flex-1 motion-safe:animate-[studia-capsule-in_0.35s_var(--ease-out-soft)]"
-            aria-hidden={false}
+            className="origin-top-left will-change-transform"
+            style={{ transform: `scale(${ANCHOR_SCALE})` }}
           >
-            {expanded}
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <div className="min-w-0">{minimized}</div>
+              {expanded ? (
+                <div className="min-w-0 motion-safe:animate-[studia-capsule-in_0.35s_var(--ease-out-soft)]">
+                  {expanded}
+                </div>
+              ) : null}
+            </div>
           </div>
-        ) : null}
+        ) : (
+          <>
+            <div className={isExpanded ? "shrink-0" : "min-w-0"}>
+              {minimized}
+            </div>
+            {isExpanded && expanded ? (
+              <div className="min-w-0 flex-1 motion-safe:animate-[studia-capsule-in_0.35s_var(--ease-out-soft)]">
+                {expanded}
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
     </button>
   );

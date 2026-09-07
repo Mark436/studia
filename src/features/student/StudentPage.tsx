@@ -8,6 +8,7 @@ import { SettingsIcon } from "@/components/ui/icons";
 import type { ToastVariant } from "@/components/ui/toastVariants";
 import { DevPanel } from "@/features/devtools/DevPanel";
 import { DebtsCard } from "./components/DebtsCard";
+import { ReinscripcionCard } from "./components/ReinscripcionCard";
 import { UNLOCK_TAP_COUNT } from "@/features/devtools/config";
 import type { DevToolsController } from "@/features/devtools/useDevConfig";
 import type { Alumno } from "@/lib/api/client";
@@ -88,6 +89,8 @@ export function StudentPage({
             ) : null}
 
             <DebtsCard adeudos={alumno.adeudos} />
+
+            <ReinscripcionCard alumno={alumno} />
 
             {devEnabled && dev ? (
               <DevPanel

@@ -412,9 +412,13 @@ Aviso local (mismo gate de opt-in y permisos que adeudos/progreso) sobre la
 fecha de reinscripción (`alumno.fechaReinscripcion`), que el API trae en cada
 fetch. Se evalúa en cada login/refresh; la fecha futura abre las ventanas.
 
-- [x] Aviso cuando la fecha cambia entre fetchs reales (una vez por fecha nueva).
-- [x] Ventanas previas a la fecha (una sola vez por fecha): T-24h, T-5min, T-10s.
-- [x] Solo si la fecha aún no ha ocurrido; si pasó o el API no la reporta, no hay aviso.
+- [x] Aviso cuando la fecha aparece por primera vez o cambia entre fetchs reales (`discovered`).
+- [x] Ventanas previas a la fecha (una sola vez por fecha): T-24h y T-30min.
+- [x] Aviso cuando el turno ya empezó (`start`), una vez, manteniendo el aviso T-24h como referencia.
+- [x] Solo si la fecha aún no ha ocurrido; una fecha ya pasada o ausente no avisa (salvo `start` justo al comenzar).
 - [x] Toast in-app (independiente del opt-in) y cápsula, por el canal configurable.
-- [x] Pruebas de la lógica pura con reloj inyectado (`reinscripcion.test.ts`); manualmente con el reloj simulado del panel dev (`ClockSection`).
-- [ ] Evaluar push programado en segundo plano (T-24h/5min/10s sin abrir la app): requiere backend con sesión/token; ver `docs/api.md`.
+- [x] Helper puro `getTimeUntilReinscripcion` (estado futuro/activo/pasado/sin-fecha) + `ReinscripcionCard` en Alumno y en la pestaña Avisos.
+- [x] Pestaña "Avisos" en la navegación inferior.
+- [x] Sección de prueba en dev (`ReinscripcionTestSection`): ver cuánto falta según escenario (24h/30min/empezó/pasó/sin fecha), combinable con el reloj simulado.
+- [x] Pruebas de la lógica pura con reloj inyectado (`reinscripcion.test.ts`).
+- [ ] Evaluar push programado en segundo plano (T-24h/30min/start sin abrir la app): requiere backend con sesión/token; ver `docs/api.md`.

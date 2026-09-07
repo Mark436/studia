@@ -13,6 +13,7 @@ export type CapsuleViewModel =
       clave: string;
       subjectName: string;
       classroom: string;
+      professor: string;
       endsLabel: string;
       progressPercent: number;
       remainingMinutes: number;
@@ -22,6 +23,7 @@ export type CapsuleViewModel =
       clave: string;
       subjectName: string;
       classroom: string;
+      professor: string;
       startsLabel: string;
       minutesUntil: number;
     }
@@ -51,6 +53,7 @@ export function buildCapsuleState(
         clave: meeting.clave,
         subjectName: meeting.subjectName,
         classroom: meeting.classroom,
+        professor: meeting.professor,
         endsLabel: formatMinutes(meeting.endMinutes),
         progressPercent: span > 0 ? Math.min((elapsed / span) * 100, 100) : 0,
         remainingMinutes: Math.ceil(meeting.endMinutes - nowMinutes),
@@ -65,6 +68,7 @@ export function buildCapsuleState(
       clave: next.clave,
       subjectName: next.subjectName,
       classroom: next.classroom,
+      professor: next.professor,
       startsLabel: formatMinutes(next.startMinutes),
       minutesUntil: Math.ceil(next.startMinutes - nowMinutes),
     };

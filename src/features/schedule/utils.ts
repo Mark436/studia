@@ -68,6 +68,40 @@ export function formatClassroomLabel(classroom: string): string | null {
   return code;
 }
 
+/**
+ * Subject name sized for the collapsed capsule's short line. Names that fit
+ * fully are kept as-is; longer multi-word names shrink to the leading words
+ * until the cap holds (single lines never wrap, so the pill stays compact).
+ * `text-xs` General Sans 500 runs roughly 6.5–7 px/char against the ~105 px
+ * line's reserved width, which makes 12 chars the verified comfort zone.
+ */
+export const CAPSULE_SUBJECT_FULL_CHARS = 12;
+
+export function shortenSubjectName(name: string): string {
+  const cleaned = name.trim().replace(/\s+/g, " ");
+  if (cleaned.length <= CAPSULE_SUBJECT_FULL_CHARS) return cleaned;
+
+  const words = cleaned.split(" ");
+  let result = cleaned;
+  while (result.length > CAPSULE_SUBJECT_FULL_CHARS && words.length > 1) {
+    words.pop();
+    result = words.join(" ");
+  }
+  return result;
+}
+
+/**
+ * Professor label for the expanded capsule. When the API stores "Apellidos,
+ * Nombre" the comma rule returns just the surnames; otherwise the full name
+ * keeps the single-line capsule compact. Null when absent/masked.
+ */
+export function formatProfessorLabel(professor: string): string | null {
+  const name = professor.trim();
+  if (name === "" || name === "*") return null;
+  const comma = name.indexOf(",");
+  return comma === -1 ? name : name.slice(0, comma).trim();
+}
+
 export function getScheduleForDay<T extends ClassMeeting>(
   meetings: T[],
   date: Date,

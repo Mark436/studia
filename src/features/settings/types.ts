@@ -1,5 +1,3 @@
-import type { CapsuleVariant } from "@/components/ui/Capsule";
-
 // Where one-shot academic events (new grades, new debt, progress gain)
 // surface: through the persistent context capsule or as classic toasts.
 export type NotificationChannel = "capsule" | "toast";
@@ -19,19 +17,16 @@ export const DEFAULT_CAPSULE_COLLAPSE_MS = 1500;
 // (clock, materias, grades, debts) stay in DevConfig.
 export interface UserSettings {
   notificationChannel: NotificationChannel;
-  capsuleVariant: CapsuleVariant;
   capsuleCollapseMs: number;
   longPressDurationMs: number;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   notificationChannel: DEFAULT_NOTIFICATION_CHANNEL,
-  capsuleVariant: "morf",
   capsuleCollapseMs: DEFAULT_CAPSULE_COLLAPSE_MS,
   longPressDurationMs: DEFAULT_LONG_PRESS_MS,
 };
 
-const CAPSULE_VARIANTS: readonly CapsuleVariant[] = ["pill", "morf"];
 const NOTIFICATION_CHANNELS: readonly NotificationChannel[] = [
   "capsule",
   "toast",
@@ -69,11 +64,6 @@ export function parseUserSettings(raw: string | null): UserSettings {
         parsed.notificationChannel,
         NOTIFICATION_CHANNELS,
         DEFAULT_USER_SETTINGS.notificationChannel,
-      ),
-      capsuleVariant: toEnum(
-        parsed.capsuleVariant,
-        CAPSULE_VARIANTS,
-        DEFAULT_USER_SETTINGS.capsuleVariant,
       ),
       capsuleCollapseMs: toPositiveNumber(
         parsed.capsuleCollapseMs,

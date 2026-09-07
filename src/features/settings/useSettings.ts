@@ -90,7 +90,6 @@ async function migrateFromDevConfig(): Promise<UserSettings> {
     return parseUserSettings(
       JSON.stringify({
         notificationChannel: parsed.notificationChannel,
-        capsuleVariant: parsed.capsuleVariant,
         capsuleCollapseMs: parsed.capsuleCollapseMs,
         longPressDurationMs: parsed.longPressDurationMs,
       }),

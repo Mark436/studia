@@ -15,14 +15,12 @@ describe("parseUserSettings", () => {
     const result = parseUserSettings(
       JSON.stringify({
         notificationChannel: "toast",
-        capsuleVariant: "pill",
         capsuleCollapseMs: 2400,
         longPressDurationMs: 800,
       }),
     );
     expect(result).toEqual({
       notificationChannel: "toast",
-      capsuleVariant: "pill",
       capsuleCollapseMs: 2400,
       longPressDurationMs: 800,
     });
@@ -32,7 +30,6 @@ describe("parseUserSettings", () => {
     const result = parseUserSettings(
       JSON.stringify({
         notificationChannel: "bogus",
-        capsuleVariant: "bogus",
         capsuleCollapseMs: -5,
         longPressDurationMs: 0,
       }),
@@ -40,7 +37,6 @@ describe("parseUserSettings", () => {
     expect(result.notificationChannel).toBe(
       DEFAULT_USER_SETTINGS.notificationChannel,
     );
-    expect(result.capsuleVariant).toBe(DEFAULT_USER_SETTINGS.capsuleVariant);
     expect(result.capsuleCollapseMs).toBe(
       DEFAULT_USER_SETTINGS.capsuleCollapseMs,
     );
@@ -50,8 +46,8 @@ describe("parseUserSettings", () => {
   });
 
   it("keeps known fields and defaults the rest when partially provided", () => {
-    const result = parseUserSettings(JSON.stringify({ capsuleVariant: "morf" }));
-    expect(result.capsuleVariant).toBe("morf");
+    const result = parseUserSettings(JSON.stringify({ longPressDurationMs: 800 }));
+    expect(result.longPressDurationMs).toBe(800);
     expect(result.notificationChannel).toBe(
       DEFAULT_USER_SETTINGS.notificationChannel,
     );

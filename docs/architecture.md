@@ -129,8 +129,8 @@ rather than duplicating DTO shapes.
 ### `src/features/settings/`
 
 Always-on user preferences surfaced as a bottom sheet opened from the Student
-area. Owns `UserSettings` (notification channel, capsule variant, capsule
-auto-collapse, long-press duration) and the adeudo-alerts switch.
+area. Owns `UserSettings` (notification channel, capsule auto-collapse,
+long-press duration) and the adeudo-alerts switch.
 
 - `types.ts` — `UserSettings` shape, defaults, and `parseUserSettings` validation.
 - `useSettings.ts` — `SettingsController` (load/persist via `lib/storage`, one-time
