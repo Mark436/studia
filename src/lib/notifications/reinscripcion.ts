@@ -7,7 +7,7 @@ import {
   SETTING_REINS_ALERTS_STATE,
 } from "@/lib/storage/settingsStore";
 
-export type ReinscripcionAlertKind = "discovered" | "24h" | "30min" | "start";
+export type ReinscripcionAlertKind = "discovered";
 export type ReinscripcionAlertOutcome = ReinscripcionAlertKind | "none";
 
 export interface ReinscripcionAlert {
@@ -25,17 +25,9 @@ export const REINSCRIPCION_ALERT_MESSAGES: Record<
   string
 > = {
   discovered: "Ya tienes fecha para tu reinscripción.",
-  "24h": "Reinscripción mañana (faltan 24 horas).",
-  "30min": "Tu reinscripción empieza en 30 minutos.",
-  start: "Tu turno de reinscripción ya empezó.",
 };
 
-const ALERT_KINDS: readonly ReinscripcionAlertKind[] = [
-  "discovered",
-  "24h",
-  "30min",
-  "start",
-];
+const ALERT_KINDS: readonly ReinscripcionAlertKind[] = ["discovered"];
 
 function isAlertKind(value: unknown): value is ReinscripcionAlertKind {
   return ALERT_KINDS.includes(value as ReinscripcionAlertKind);
@@ -102,8 +94,9 @@ export function getTimeUntilReinscripcion(
 /**
  * Pure decision (no storage, no timers): which alert to fire now, given the
  * previously known date, the current one and the kinds already announced for
- * the current date. Alerts only apply while the reinscription date is still
- * in the future, except `start`, which fires when the turn has begun.
+ * the current date. Only `discovered` exists, and only while the date is
+ * still in the future: a date that already happened (or is happening) no
+ * longer interests us, and passing it never re-arms the alert.
  */
 export function getReinscripcionAlert(
   previousIso: string | null,
@@ -117,34 +110,16 @@ export function getReinscripcionAlert(
   const fecha = new Date(current);
   if (Number.isNaN(fecha.getTime())) return null;
 
-  const remainingMs = fecha.getTime() - now.getTime();
+  // Fecha ya ocurrida o en curso: no avisamos. Dejar de interesar tras más de
+  // un día es decisión de la línea de tiempo (getTimeUntilReinscripcion).
+  if (fecha.getTime() - now.getTime() <= 0) return null;
 
-  // El turno (o la fecha) ya empezó/ocurrió: avisamos "start" una sola vez.
-  if (remainingMs <= 0) {
-    if (fired.includes("start")) return null;
-    return { kind: "start", fecha };
-  }
+  // La fecha es válida (todavía futura): avisamos "discovered" una sola vez,
+  // cuando aparece por primera vez o cuando cambia entre dos fetchs reales.
+  if (fired.includes("discovered")) return null;
+  if (previousIso !== null && previousIso === current) return null;
 
-  // La fecha aparece por primera vez (o cambió entre dos fetchs reales) y es
-  // futura: aviso de descubrimiento una vez por fecha.
-  if (
-    (previousIso === null || previousIso !== current) &&
-    !fired.includes("discovered")
-  ) {
-    return { kind: "discovered", fecha };
-  }
-
-  // Ventanas temporales: se elige la más estrecha que aplica; cada una se
-  // anuncia una sola vez. Faltan 30 min / 24 h antes de la fecha.
-  const kind: ReinscripcionAlertKind | null =
-    remainingMs <= 30 * MINUTO_MS
-      ? "30min"
-      : remainingMs <= DIA_MS
-        ? "24h"
-        : null;
-
-  if (kind === null || fired.includes(kind)) return null;
-  return { kind, fecha };
+  return { kind: "discovered", fecha };
 }
 
 interface ReinscripcionAlertState {
@@ -179,9 +154,10 @@ async function readAlertState(): Promise<ReinscripcionAlertState | null> {
 }
 
 /**
- * Runs on every real fetch (login/refresh). Fires an alert only when the date
- * is still in the future AND the corresponding stage has not been announced
- * yet for that date. The in-app toast surfaces regardless of the system
+ * Runs on every real fetch (login/refresh). Fires the single "discovered"
+ * alert only when the date is still in the future AND it is the first time we
+ * announce it for that date. Once the date happens (or already happened when
+ * fetched) nothing fires. The in-app toast surfaces regardless of the system
  * notification opt-in; the push only if opted in and permitted.
  */
 export async function notifyNewReinscripcion(

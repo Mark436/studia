@@ -96,8 +96,13 @@ describe("getReinscripcionAlert", () => {
     expect(getReinscripcionAlert(null, null, new Date(), [])).toBeNull();
   });
 
-  it("un fecha futura descubierta por primera vez avisa discovered", () => {
-    const alert = getReinscripcionAlert(null, FECHA_ISO, alMomento(2 * DIA_MS), []);
+  it("una fecha futura descubierta por primera vez avisa discovered", () => {
+    const alert = getReinscripcionAlert(
+      null,
+      FECHA_ISO,
+      alMomento(2 * DIA_MS),
+      [],
+    );
     expect(alert?.kind).toBe("discovered");
   });
 
@@ -125,13 +130,13 @@ describe("getReinscripcionAlert", () => {
     ).toBeNull();
   });
 
-  it("al descubrir una fecha lejana por primera vez avisa discovered", () => {
+  it("una fecha futura lejana descubierta por primera vez avisa discovered", () => {
     expect(
       getReinscripcionAlert(null, FECHA_ISO, alMomento(10 * DIA_MS), []),
     ).toEqual({ kind: "discovered", fecha: new Date(FECHA_ISO) });
   });
 
-  it("fuera de las ventanas y ya descubierta no hay aviso", () => {
+  it("una fecha ya descubierta nunca vuelve a avisar estando en el futuro", () => {
     expect(
       getReinscripcionAlert(
         FECHA_ISO,
@@ -142,74 +147,20 @@ describe("getReinscripcionAlert", () => {
     ).toBeNull();
   });
 
-  it("anuncia la ventana de 24 horas", () => {
-    const alert = getReinscripcionAlert(
-      FECHA_ISO,
-      FECHA_ISO,
-      alMomento(24 * 60 * 60 * 1000),
-      ["discovered"],
-    );
-    expect(alert?.kind).toBe("24h");
+  it("una fecha ya ocurrida no avisa aunque sea la primera vez", () => {
+    const pasada = alMomentoMas(5 * MINUTO_MS);
+    expect(getReinscripcionAlert(null, FECHA_ISO, pasada, [])).toBeNull();
   });
 
-  it("anuncia la ventana de 30 minutos", () => {
-    const alert = getReinscripcionAlert(
-      FECHA_ISO,
-      FECHA_ISO,
-      alMomento(30 * 60 * 1000),
-      ["discovered", "24h"],
-    );
-    expect(alert?.kind).toBe("30min");
-  });
-
-  it("la ventana más estrecha que aplica gana", () => {
-    const alert = getReinscripcionAlert(
-      FECHA_ISO,
-      FECHA_ISO,
-      alMomento(10 * 60 * 1000),
-      ["discovered"],
-    );
-    expect(alert?.kind).toBe("30min");
-  });
-
-  it("un aviso ya anunciado para esa fecha no se repite", () => {
+  it("una fecha ya ocurrida no vuelve a avisar (ni se re-arranca)", () => {
+    const pasada = alMomentoMas(5 * MINUTO_MS);
     expect(
-      getReinscripcionAlert(
-        FECHA_ISO,
-        FECHA_ISO,
-        alMomento(24 * 60 * 60 * 1000),
-        ["discovered", "24h"],
-      ),
+      getReinscripcionAlert(null, FECHA_ISO, pasada, ["discovered"]),
     ).toBeNull();
   });
 
-  it("anuncia la siguiente ventana aunque la anterior ya haya pasado", () => {
-    const alert = getReinscripcionAlert(
-      FECHA_ISO,
-      FECHA_ISO,
-      alMomento(30 * 60 * 1000),
-      ["discovered", "24h"],
-    );
-    expect(alert?.kind).toBe("30min");
-  });
-
-  it("una fecha futura sin ventana activa (pero ya descubierta) no avisa", () => {
-    expect(
-      getReinscripcionAlert(
-        FECHA_ISO,
-        FECHA_ISO,
-        new Date(),
-        ["discovered"],
-      ),
-    ).toBeNull();
-  });
-
-  it("cuando el turno ya empezó avisa start (una vez)", () => {
-    const pasada = alMomentoMas(5 * 60 * 1000);
-    const alert = getReinscripcionAlert(null, FECHA_ISO, pasada, []);
-    expect(alert?.kind).toBe("start");
-    expect(
-      getReinscripcionAlert(null, FECHA_ISO, pasada, ["start"]),
-    ).toBeNull();
+  it("una fecha pasada hace más de un día sigue sin avisar", () => {
+    const pasada = alMomentoMas(2 * DIA_MS);
+    expect(getReinscripcionAlert(null, FECHA_ISO, pasada, [])).toBeNull();
   });
 });

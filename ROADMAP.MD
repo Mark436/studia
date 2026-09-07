@@ -410,15 +410,15 @@ Pantalla de preferencias del usuario en el área Alumno, desacoplada de dev mode
 
 Aviso local (mismo gate de opt-in y permisos que adeudos/progreso) sobre la
 fecha de reinscripción (`alumno.fechaReinscripcion`), que el API trae en cada
-fetch. Se evalúa en cada login/refresh; la fecha futura abre las ventanas.
+fetch. Se evalúa en cada login/refresh; solo avisa una fecha que siga en el
+futuro cuando se obtiene.
 
-- [x] Aviso cuando la fecha aparece por primera vez o cambia entre fetchs reales (`discovered`).
-- [x] Ventanas previas a la fecha (una sola vez por fecha): T-24h y T-30min.
-- [x] Aviso cuando el turno ya empezó (`start`), una vez, manteniendo el aviso T-24h como referencia.
-- [x] Solo si la fecha aún no ha ocurrido; una fecha ya pasada o ausente no avisa (salvo `start` justo al comenzar).
+- [x] Aviso único `discovered` cuando llega una fecha válida (todavía futura), una sola vez por fecha.
+- [x] Una fecha ya ocurrida (o que ocurre al evaluarla) no avisa; que pase el tiempo no re-arranca el aviso.
+- [x] Los antiguos avisos de ventana (T-24h, T-30min) y `start` se retiraron del flujo; ver `docs/reinscripcion-redesign.md`.
 - [x] Toast in-app (independiente del opt-in) y cápsula, por el canal configurable.
-- [x] Helper puro `getTimeUntilReinscripcion` (estado futuro/activo/pasado/sin-fecha) + `ReinscripcionCard` en Alumno y en la pestaña Avisos.
+- [x] Helper puro `getTimeUntilReinscripcion` (estado futuro/activo/pasado/sin-fecha) + `ReinscripcionCard` en Alumno y en la pestaña Avisos; la línea de tiempo sigue validando la fecha aunque haya pasado.
 - [x] Pestaña "Avisos" en la navegación inferior.
 - [x] Sección de prueba en dev (`ReinscripcionTestSection`): ver cuánto falta según escenario (24h/30min/empezó/pasó/sin fecha), combinable con el reloj simulado.
 - [x] Pruebas de la lógica pura con reloj inyectado (`reinscripcion.test.ts`).
-- [ ] Evaluar push programado en segundo plano (T-24h/30min/start sin abrir la app): requiere backend con sesión/token; ver `docs/api.md`.
+- [ ] Evaluar push programado en segundo plano (futuro `discovered` sin abrir la app): requiere backend con sesión/token; ver `docs/api.md`.
