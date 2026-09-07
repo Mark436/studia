@@ -1,12 +1,8 @@
-// La lectura del PDF usa `pdfjs-dist`, que pesa mucho: se importa de forma
-// dinámica dentro de `leerFechasInicioLabores` para no inflar el bundle
-// principal. El resto del módulo es lógica pura de texto.
+// Lógica pura de interpretación del texto del calendario oficial. La descarga
+// y extracción del texto del PDF vive en `pdfTexto.ts` (pdfjs + worker); este
+// módulo solo interpreta las fechas de «inicio de labores» sobre ese texto.
 
-// El worker se referencia como chunk propio (asset aparte, no en el JS
-// principal). Vite lo empaqueta con `?worker&url` en formato ES, porque
-// pdfjs v6 crea el worker como módulo (`new Worker(src, { type: "module" })`);
-// la ruta cruda del paquete (`?url`) no se sirve bien en dev.
-import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?worker&url";
+import { leerTextoPDF } from "./pdfTexto";
 
 /** Meses con su índice (0 = enero). Los abreviados comparten prefijo con el nombre. */
 const MESES: readonly [string, number][] = [
@@ -108,45 +104,19 @@ export function extraerFechasInicioLabores(texto: string): Date[] {
   return fechas;
 }
 
-/**
- * URL para descargar el PDF del calendario: en dev pasa por el proxy de vite
- * (mismo origen) y en producción va directo a `ith.mx`.
- */
-export function urlCalendarioPdf(archivo: string): string {
-  const ruta = `/documentos/${encodeURIComponent(archivo)}`;
-
-  return import.meta.env.DEV ? ruta : `https://ith.mx${ruta}`;
-}
-
 export interface ResultadoLecturaCalendario {
   fechas: Date[];
   texto: string;
 }
 
-/** Descarga el PDF del calendario y extrae sus fechas de inicio de labores. */
+/**
+ * Descarga el PDF del calendario, extrae su texto con pdf.js y devuelve las
+ * fechas de «inicio de labores» junto con el texto crudo.
+ */
 export async function leerFechasInicioLabores(
   url: string,
 ): Promise<ResultadoLecturaCalendario> {
-  const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
-  GlobalWorkerOptions.workerSrc = workerUrl;
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Error HTTP: ${response.status}`);
-  }
-
-  const data = new Uint8Array(await response.arrayBuffer());
-  const documento = await getDocument({ data }).promise;
-
-  let texto = "";
-  for (let i = 1; i <= documento.numPages; i++) {
-    const pagina = await documento.getPage(i);
-    const contenido = await pagina.getTextContent();
-    texto +=
-      contenido.items
-        .map(item => ("str" in item ? item.str : ""))
-        .join(" ") + "\n";
-  }
+  const texto = await leerTextoPDF(url);
 
   return { fechas: extraerFechasInicioLabores(texto), texto };
 }

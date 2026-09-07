@@ -11,10 +11,8 @@ import {
 } from "@/lib/prehorario";
 import { getMateriasPendientes } from "@/features/student/reticulaPendiente";
 import { elegirProximaFechaLabores } from "@/lib/busquedaHorarios";
-import {
-  leerFechasInicioLabores,
-  urlCalendarioPdf,
-} from "@/lib/calendarioLabores";
+import { leerFechasInicioLabores } from "@/lib/calendarioLabores";
+import { leerTextoPDF, urlDocumentoPdf } from "@/lib/pdfTexto";
 
 const VENTANA_DIAS = 7;
 
@@ -27,9 +25,9 @@ function fechaLegible(fecha: Date | null): string {
 }
 
 export function PrehorarioTestSection({ alumno }: PrehorarioTestSectionProps) {
-  const [corriendo, setCorriendo] = useState<"prehorario" | "calendario" | null>(
-    null,
-  );
+  const [corriendo, setCorriendo] = useState<
+    "prehorario" | "calendario" | "prehorario-pdf" | null
+  >(null);
   const [lineas, setLineas] = useState<string[]>([]);
 
   function emit(texto: string) {
@@ -108,7 +106,7 @@ export function PrehorarioTestSection({ alumno }: PrehorarioTestSectionProps) {
         emit(`[calendario] oficial url: ${oficial.url}`);
         try {
           const lectura = await leerFechasInicioLabores(
-            urlCalendarioPdf(oficial.archivo),
+            urlDocumentoPdf(oficial.archivo),
           );
           if (lectura.fechas.length > 0) {
             emit(`[calendario] inicio de labores (${lectura.fechas.length}):`);
@@ -141,6 +139,43 @@ export function PrehorarioTestSection({ alumno }: PrehorarioTestSectionProps) {
       console.error("[calendario] error:", error);
       emit(
         `[calendario] error: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      setCorriendo(null);
+    }
+  }
+
+  async function ejecutarPrehorarioPdf() {
+    if (!alumno) return;
+    setCorriendo("prehorario-pdf");
+    setLineas([]);
+    try {
+      const prehorarios = await obtenerPrehorarios();
+      const elegido = elegirPrehorarioCarrera(prehorarios, alumno.carrera);
+      emit(`[prehorario-pdf] carrera: ${alumno.carrera}`);
+      if (!elegido.archivo) {
+        emit("[prehorario-pdf] sin prehorario para la carrera todavía.");
+        return;
+      }
+      const url = urlDocumentoPdf(elegido.archivo);
+      emit(`[prehorario-pdf] archivo: ${elegido.archivo}`);
+      emit(`[prehorario-pdf] url: ${url}`);
+      const texto = await leerTextoPDF(url);
+      const lineas = texto
+        .split("\n")
+        .map(linea => linea.trim())
+        .filter(Boolean);
+      emit(
+        `[prehorario-pdf] ${lineas.length} líneas extraídas (${texto.length} caracteres):`,
+      );
+      emit("----- primeras 40 líneas -----");
+      for (const linea of lineas.slice(0, 40)) {
+        emit(linea);
+      }
+    } catch (error) {
+      console.error("[prehorario-pdf] error:", error);
+      emit(
+        `[prehorario-pdf] error: ${error instanceof Error ? error.message : String(error)}`,
       );
     } finally {
       setCorriendo(null);
@@ -181,6 +216,25 @@ export function PrehorarioTestSection({ alumno }: PrehorarioTestSectionProps) {
         className="w-full"
       >
         {corriendo === "calendario" ? "Buscando…" : "Probar calendario"}
+      </Button>
+
+      <h4 className="mt-2 text-sm font-semibold text-on-surface">
+        Prueba PDF de prehorario (texto)
+      </h4>
+      <p className="text-xs text-on-surface-variant">
+        Descarga el prehorario de la carrera y muestra las primeras líneas de
+        texto extraídas con pdf.js (mismo worker que el calendario). Sirve para
+        inspeccionar la estructura de las tablas antes de definir el JSON.
+      </p>
+      <Button
+        variant="secondary"
+        onClick={ejecutarPrehorarioPdf}
+        disabled={!alumno || corriendo !== null}
+        className="w-full"
+      >
+        {corriendo === "prehorario-pdf"
+          ? "Leyendo…"
+          : "Probar PDF de prehorario (texto)"}
       </Button>
 
       {lineas.length > 0 ? (

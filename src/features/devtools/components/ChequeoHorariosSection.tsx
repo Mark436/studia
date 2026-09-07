@@ -13,10 +13,8 @@ import {
 } from "@/lib/busquedaHorarios";
 import type { EstadoChequeoHorarios } from "@/lib/busquedaHorarios";
 import { getNow } from "@/lib/devtools/clock";
-import {
-  leerFechasInicioLabores,
-  urlCalendarioPdf,
-} from "@/lib/calendarioLabores";
+import { leerFechasInicioLabores } from "@/lib/calendarioLabores";
+import { urlDocumentoPdf } from "@/lib/pdfTexto";
 import {
   elegirPrehorarioCarrera,
   obtenerCalendarioOficial,
@@ -140,7 +138,7 @@ export function ChequeoHorariosSection({
         case "procesar-calendario": {
           if (!estado.calendarioVisto) break;
           const lectura = await leerFechasInicioLabores(
-            urlCalendarioPdf(estado.calendarioVisto),
+            urlDocumentoPdf(estado.calendarioVisto),
           );
           if (lectura.fechas.length === 0) {
             emit(

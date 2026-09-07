@@ -462,6 +462,13 @@ antes de la inscripción.
   resuelve el proxy de vite. Revisitar solo si se confirma que la app vivirá en
   otro origen.
 
+- [x] **Lectura de PDF separada del calendario**: `leerTextoPDF` /
+  `urlDocumentoPdf` viven en `src/lib/pdfTexto.ts` (worker de pdf.js), sin
+  lógica de calendario; `leerFechasInicioLabores` solo interpreta fechas sobre
+  ese texto. Prueba en modo dev: «Probar PDF de prehorario (texto)» descarga
+  el prehorario de la carrera y muestra las primeras líneas extraídas para
+  decidir el JSON de las tablas (siguiente paso, pendiente).
+
 ### Pendiente (plan)
 - [ ] **Leer el PDF** del prehorario (extraer grupos/materias/horas). El usuario
   investigará el enfoque (parsing del PDF) y definirá formato/estructura.
