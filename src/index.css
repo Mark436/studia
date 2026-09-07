@@ -255,6 +255,54 @@ body {
   box-shadow: var(--studia-shadow-card);
 }
 
+/* Cápsula — escala tipográfica y de espaciado (nombres tipo Material).
+   Roles de jerarquía en vez de valores sueltos: la cápsula se ancla a esta
+   escala (displays → títulos → cuerpo → caption) y los contadores de
+   numerología usan su propia sub-escala (`--text-capsule-num-*`), donde la
+   hora es la única protagonista pesada. Generadas como utilidades Tailwind:
+   `text-capsule-body`, `gap-capsule-gap-lg`, `p-capsule-pad`, … */
+@theme {
+  /* Roles de texto (ancla colapsada y variante expandida). */
+  --text-capsule-display-lg: 1.875rem; /* 30 — flash seguimiento, valor héroe */
+  --text-capsule-display: 1.5rem;      /* 24 — flash detalle */
+  --text-capsule-title: 1.25rem;       /* 20 — titular done/exento */
+  --text-capsule-headline: 1.125rem;   /* 18 — salón expandido */
+  --text-capsule-body: 0.875rem;       /* 14 — materia expandida, salón, meta */
+  --text-capsule-caption: 0.75rem;     /* 12 — materia colapsada, profesor */
+  /* Contadores de numerología (la hora grande, la unidad fino). */
+  --text-capsule-num-h-lg: 1.875rem;   /* 30 */
+  --text-capsule-num-m-lg: 1.375rem;   /* 22 */
+  --text-capsule-num-u-lg: 0.8125rem;  /* 13 */
+  --text-capsule-num-h: 1.125rem;      /* 18 */
+  --text-capsule-num-m: 1rem;          /* 16 */
+  --text-capsule-num-u: 0.625rem;      /* 10 */
+  /* Espaciado interno (escala base 4 px de Tailwind, nombres propios). */
+  --spacing-capsule-gap: 0.5rem;       /* 8 — pila colapsada / fila */
+  --spacing-capsule-gap-lg: 0.625rem;  /* 10 — fila expandida */
+  --spacing-capsule-pad: 1.25rem;      /* 20 — padding expandido */
+  --spacing-capsule-pad-sm: 1rem;      /* 16 — padding colapsado */
+  --spacing-capsule-line-sm: 10.5rem;  /* ancho máx. de materia colapsada */
+}
+
+/* Neutral capsule glass without the 1px outline border: the context capsule
+   whose state is about the future (upcoming / done / empty / flash) reads
+   lighter than an in-progress class, so it drops the border band. */
+@utility glass-panel-bare {
+  position: relative;
+  background: var(--studia-glass-tint);
+  -webkit-backdrop-filter: blur(var(--studia-glass-blur)) saturate(1.6);
+  backdrop-filter: blur(var(--studia-glass-blur)) saturate(1.6);
+  box-shadow: var(--studia-glass-shadow);
+}
+
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .glass-panel-bare {
+    background: color-mix(in oklab, var(--studia-surface) 16%, transparent);
+  }
+}
+
 /* Accent variant of the glass recipe: tints the surface cobalto, reserved for
    the context capsule when a class is in progress. */
 @utility glass-panel-accent {

@@ -3,7 +3,7 @@ import type { ResolvedMeeting } from "./types";
 import {
   autoCapsuleEvent,
   buildCapsuleState,
-  getTomorrowFirstMeeting,
+  getNextClassInfo,
   toCapsuleTick,
 } from "./capsuleState";
 
@@ -108,13 +108,13 @@ describe("autoCapsuleEvent", () => {
   });
 });
 
-describe("getTomorrowFirstMeeting", () => {
+describe("getNextClassInfo", () => {
   // Fixed dates: lunes 2026-08-24 and domingo 2026-08-30.
   const monday = new Date(2026, 7, 24, 20, 0);
   const sunday = new Date(2026, 7, 30, 20, 0);
 
   it("returns tomorrow's earliest class, ignoring other days", () => {
-    const result = getTomorrowFirstMeeting(
+    const result = getNextClassInfo(
       [
         meeting({
           clave: "TARDE",
@@ -139,28 +139,44 @@ describe("getTomorrowFirstMeeting", () => {
     );
 
     expect(result).toEqual({
+      weekday: 2,
       subjectName: "Redes",
       startsLabel: "09:30",
-      startsAt: new Date(2026, 7, 25, 9, 30, 0, 0),
     });
   });
 
-  it("returns null when tomorrow has no classes", () => {
+  it("looks further ahead when tomorrow has no classes", () => {
+    const result = getNextClassInfo(
+      [
+        meeting({ subjectName: "Ética", weekday: 4, startMinutes: 600 }),
+        meeting({ subjectName: "Redes", weekday: 3, startMinutes: 600 }),
+      ],
+      monday,
+    );
+
+    expect(result).toEqual({
+      weekday: 3,
+      subjectName: "Redes",
+      startsLabel: "10:00",
+    });
+  });
+
+  it("returns null when the week has no more classes", () => {
     expect(
-      getTomorrowFirstMeeting([meeting({ weekday: 1 })], monday),
+      getNextClassInfo([meeting({ weekday: 1 })], monday),
     ).toBeNull();
   });
 
   it("wraps the week: Sunday evening points at Monday", () => {
-    const result = getTomorrowFirstMeeting(
+    const result = getNextClassInfo(
       [meeting({ subjectName: "Cálculo", weekday: 1, startMinutes: 600 })],
       sunday,
     );
 
     expect(result).toEqual({
+      weekday: 1,
       subjectName: "Cálculo",
       startsLabel: "10:00",
-      startsAt: new Date(2026, 7, 31, 10, 0, 0, 0),
     });
   });
 });

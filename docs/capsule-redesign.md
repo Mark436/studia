@@ -40,37 +40,177 @@ Minimizado:
   12 caracteres) que nunca envuelve.
 
 Expandido (`stacked`):
-- Mismo contenido y misma distribución, **escalado ×1.25 por `transform`**
-  (nunca se cambia `font-size`), origen `top-left`.
+- Mismo contenido y misma distribución, en la **variante tipográfica grande**
+  (`minimizedExpanded`, layout real). Se abandonó el `transform: scale ×1.25`
+  porque el contenido desbordaba el contenedor: despegaba el anillo del borde
+  y la cápsula se veía chica.
 - Debajo de la materia, el **profesor** en jerarquía secundaria
   (`formatProfessorLabel`: solo apellidos si llega "Apellidos, Nombre").
 - Ya **no** se muestra "Termina a las".
 
 ### Fase 4 — Barra de progreso como borde SVG
 
-- Se reemplazó la máscara CSS del borde-progreso por un `<rect>` SVG con
-  `vector-effect: non-scaling-stroke` y `pathLength`, posicionado `inset-0`
-  relativo a la cápsula (siempre pegado al borde).
-- El radio del rect anima en sincronía con el `border-radius` de la cápsula.
-- Dirección de revelado: desde la esquina superior-izquierda en sentido
-  horario.
+- Se reemplazó la máscara CSS del borde-progreso por dos `<path>` de medio
+  perímetro con `vector-effect: non-scaling-stroke` y `pathLength`, dentro de
+  un `<g>` posicionado `inset-0` relativo a la cápsula (siempre pegado al
+  borde).
+- Dirección de revelado (decidido por el usuario): ambos arcos arrancan en el
+  **medio del borde izquierdo** y se llenan a la vez hacia arriba y abajo;
+  el hueco se cierra en el medio del borde derecho.
+- El radio del arco coincide con el de la cápsula (`EXPANDED_RADIUS_PX` 20 en
+  expandido; `height/2` en píldora) y es **estático por estado** — no se
+  tweena (Fase 1), así el trazo tiene la forma píldora/card correcta en
+  cualquier pantalla.
 
-## Fases pendientes (para seguir dictando)
+### Fase 5 — Tokens de escala y cápsula neutra sin borde
 
-1. **Estado "Próxima clase"**: ¿aplicar el mismo layout minimizado (salón junto
-   a los números + materia abajo) y el mismo expandido escalado con profesor?
-   Hoy conserva el diseño anterior (detalle a la derecha: "Luego · Salón ·
-   HH:MM · en Ym").
-2. **Estados "Por hoy terminaste" / "Sin clases hoy"**: conservar tal cual o
-   revisar el mensaje/mañana.
-3. **Evento académico (flash)**: las 2 fases (detalle → seguimiento) — ¿deben
-   usar también el layout `stacked` escalado o mantener el bloque derecho?
-4. **Profesor**: validar la heurística de apellidos con datos reales
+- Los tamaños de la cápsula (tipografía y espaciado) se declaran en una escala
+  propia con nombres de rol tipo Material (`@theme` en `index.css`):
+  `--text-capsule-*` y `--spacing-capsule-*`, consumidas como utilidades
+  Tailwind (`text-capsule-body`, `gap-capsule-gap-lg`, `p-capsule-pad`).
+  Documentadas en `docs/design.md` §2.
+- Contadores: sub-escala de numerología `--text-capsule-num-*`. La hora baja a
+  `font-semibold` (más ligera; la jerarquía la da el tamaño, no el peso).
+- Unidades redondeadas a la escala (9 px → 10 px).
+- El salón es `font-medium` (no bold): el blanco sobre el glass ya lo hace
+  resaltar. **Sin horas de inicio/fin** en ninguna cápsula: la información
+  adicional es salón, profesor y materia.
+- La cápsula neutra (upcoming / done / empty / flash) usa
+  `glass-panel-bare`: mismo glass, sin el anillo de 1 px. Solo «En clase»
+  conserva el borde acento (`glass-panel-accent`).
+
+## 5. Estados de la cápsula — inventario (plegado / desplegado)
+
+Fuente de render: `features/schedule/components/ScheduleCapsule.tsx`. Estados
+puros: `empty | in-class | upcoming | done` (`features/schedule/capsuleState.ts`),
+más el **flash** transitorio de eventos académicos. Todos pasan por la misma
+primitiva (`components/ui/Capsule.tsx`): plegado = ancla; desplegado = ancla
+escalada (`stacked`) o bloque de detalle a la derecha, según el caso.
+Auto-colapso tras `autoCollapseMs` (por defecto 1500 ms); tap/evento alterna
+manual. Expansión automática solo en eventos importantes (inicio de clase,
+T-60 min, T-1 min) y flashes académicos.
+
+### 5.1 En clase (`in-class`) — tono acento, `stacked`
+
+Aparece mientras `inicio ≤ ahora < fin`. Lleva `progressPercent` (anillo).
+
+**Plegado:**
+- Línea 1 — `DurationCounter` con `remainingMinutes` (`DurationCounter`:
+  horas `font-semibold` + "h" fina; minutos a mitad de tamaño + "m" más chica;
+  todo `primary-strong`, `tabular-nums`; escala propia `--text-capsule-num-*`)
+  + **salón crudo** a la derecha en la misma línea (`items-baseline
+  gap-capsule-gap`, `text-capsule-body font-medium text-on-surface`).
+- Línea 2 — materia resumida (`shortenSubjectName`, umbral 12),
+  `text-capsule-caption font-medium text-on-surface-variant`,
+  `max-w-capsule-line-sm truncate` (nunca envuelve).
+
+**Desplegado (`stacked`):**
+- Ancla en variante tipográfica grande (`minimizedExpanded`, layout real,
+  sin `transform: scale`). Línea 1: `DurationCounter` `lg` + **salón**
+  (`min-w-0 truncate text-capsule-headline font-medium text-on-surface`).
+  Línea 2: **materia completa** (sin resumir),
+  `text-capsule-body font-medium text-on-surface`, `truncate` y con revelado
+  progresivo (`studia-capsule-in`).
+- Bloque revelado bajo la materia: **profesor** (`formatProfessorLabel`: solo
+  apellidos si llega "Apellidos, Nombre"), `text-capsule-caption font-medium
+  text-on-surface-variant truncate`. Solo aparece desplegado.
+- **Sin horas**: ninguna cápsula muestra a qué hora inicia o termina; la
+  información adicional es salón, profesor y materia.
+- Colores distintos entre materia (`text-on-surface`) y profesor
+  (`text-on-surface-variant`).
+- `min-w-0` + `truncate` en salón, materia y profesor: el contenido cabe en
+  pantallas estrechas (móvil) sin desbordar.
+- Plegado: salón `min-w-0 truncate`.
+- Anillo de progreso en el borde (SVG — ver Fase 4).
+- CAMBIOS HECHOS (todo ajustable): contenido que entra en móvil, materia
+  completa y ligera al desplegar con revelado progresivo, horas del contador
+  más ligeras, salón en `font-medium` (el blanco ya lo hace resaltar),
+  colores materia/profesor distintos, prioridad de apellidos del profesor,
+  sin horas de inicio/fin en ninguna cápsula.
+
+### 5.2 Próxima clase (`upcoming`) — tono neutro, `stacked`
+
+Aparece cuando no hay clase en curso y sí una futura hoy.
+
+**Plegado** — mismo formato que "En clase" (colores tal cual los establecidos):
+- Línea 1 — `DurationCounter` con `minutesUntil` + **salón**
+  (`min-w-0 truncate text-capsule-body font-medium text-on-surface`).
+- Línea 2 — materia resumida (`shortenSubjectName`, umbral 12),
+  `text-capsule-caption font-medium text-on-surface-variant truncate`.
+
+**Desplegado (`stacked`)** — sigue el diseño de clase en curso:
+- Línea 1 — `DurationCounter` `lg` con `minutesUntil` + salón
+  (`text-capsule-headline font-medium text-on-surface`). Línea 2 — materia
+  completa `text-capsule-body font-medium text-on-surface truncate` con
+  revelado progresivo.
+- Bloque revelado: **profesor** (`formatProfessorLabel`). Sin horas de inicio.
+- CAMBIOS HECHOS (ajustable): migrado a `stacked`; plegado con el formato de
+  clase en curso; sin "dura X" ni horas de inicio/fin (solo materia, salón y
+  profesor, como en "En clase").
+
+### 5.3 Sin clase por delante (`done` / `empty`) — tono neutro, un solo estado
+
+Los estados `done` y `empty` se fusionan en render: cuando hoy no queda clase
+por delante, la cápsula mira la **próxima clase futura** (primero con clase,
+desde mañana en adelante; `getNextClassInfo`). Sin clases restantes en la
+semana, queda el mensaje calmado y la app sigue funcionando.
+
+**Plegado:**
+- Con clase mañana → solo `mañana HH:MM` (`text-capsule-body font-semibold
+  tabular-nums text-primary-strong`). Ya no se usa el conteo de horas ("Xh");
+  el formato es fijo (la regla de las 22:00/3 h desapareció).
+- Con clase en un día posterior → `nos vemos el {día}` (p. ej. "nos vemos el
+  lunes"), `text-capsule-body font-semibold text-primary-strong`.
+- Sin clases en la semana → `Consulta otro día desde tu horario.`
+  (`text-capsule-body font-medium text-on-surface-variant`).
+
+**Desplegado:**
+- Mantiene el mensaje del plegado grande (`font-display text-capsule-title
+  font-bold`): `Mañana HH:MM` / `Nos vemos el {día}`.
+- Debajo: la referencia al día (`mañana` o el nombre del día,
+  `text-capsule-caption uppercase tracking`) y bajo ella la **materia resumida**
+  (`shortenSubjectName`) con su hora (`text-capsule-body`, materia en
+  `font-semibold text-on-surface`).
+- Sin clases en la semana → solo el mensaje `Consulta otro día desde tu
+  horario.`.
+- CAMBIOS HECHOS (ajustable): sin horas, `mañana` / `nos vemos el día`,
+  mensaje + día + materia resumida al desplegar.
+
+### 5.5 Flash de evento académico — tono neutro, `stacked`
+
+Ruta `notification` (calificaciones nuevas, adeudos, progreso, reinscripción).
+Secuencia: detalle (~2.2 s) → seguimiento (~2 s) → colapso. Canal configurable
+(cápsula / toast) — mismo evento una sola vez.
+
+**Plegado** — el detalle deja de estar a la derecha: **filas apiladas que
+aparecen línea por línea** (cada una con `studia-capsule-in`):
+- Línea 1 — título `text-capsule-body font-semibold text-on-surface`
+  (ej. "Nueva calificación").
+- Luego la fase detalle agrega `notification.detail`
+  (`text-capsule-body font-medium text-on-surface-variant`, ej. "Matemáticas
+  10"); en fase seguimiento aparece `followUpDetail`
+  (`text-capsule-body font-medium tabular-nums text-primary-strong`, ej.
+  "Promedio · 8.75").
+
+**Desplegado (`stacked`)** — ancla con el título (`text-capsule-headline`) y
+las filas; bloque de énfasis bajo la materia:
+- Fase detalle: eyebrow `notification.title` + `notification.detail`
+  `font-display text-capsule-display font-bold leading-tight`.
+- Fase seguimiento: eyebrow `followUpTitle` + `followUpDetail` `font-display
+  text-capsule-display-lg font-bold tabular-nums text-primary-strong`.
+- CAMBIOS HECHOS (ajustable): migrado a `stacked`; filas progresivas; el
+  desplegado muestra título → detalle → consecuencia.
+
+## Pendientes (para seguir dictando) + calibración abierta
+
+1. **Profesor**: validar la heurística de apellidos con datos reales
    (`docente` de la API) — formato exacto a confirmar.
-5. **Resumido de materia**: calibrar el umbral de 12 caracteres contra
-   nombres reales (hoy es una estimación de anchura General Sans 500 text-xs).
-6. **Factor de escala ×1.25 y duración 0.6 s**: afinarlos viéndolos en
-   dispositivo.
-7. **Dirección del anillo de progreso**: confirmar si la revelación horaria
-   (desde arriba-izquierda) es la deseada o debe ser de izquierda a derecha
-   como la máscara anterior.
+2. **Resumido de materia**: calibrar el umbral de 12 caracteres contra
+   nombres reales (hoy es una estimación de anchura General Sans 500
+   text-capsule-caption).
+3. **Calibración en dispositivo (ajustable, ya implementado)**: timings del
+   morf (0.6 s) y tamaños del expandido — ya en tokens (`text-capsule-*`,
+   `spacing-capsule-*`), línea "· dura X" (solo upcoming), `gap`, paddings,
+   revelado con `studia-capsule-in`. Dirección del anillo (medio-izquierda →
+   arriba y abajo) ya implementada en Fase 4; todo lo tocado queda abierto a
+   correcciones al verlo en el teléfono.

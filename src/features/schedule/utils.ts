@@ -28,35 +28,6 @@ export function addDays(date: Date, amount: number): Date {
   return next;
 }
 
-const HOUR_MS = 3_600_000;
-
-/**
- * Whole hours between `from` and a future `target` (floor). Negative when the
- * target has already passed; the caller decides how to treat that.
- */
-export function wholeHoursUntil(target: Date, from: Date): number {
-  return Math.floor((target.getTime() - from.getTime()) / HOUR_MS);
-}
-
-/**
- * Threshold for showing tomorrow's class as an hours countdown: only while
- * there are more than CAPSULE_TOMORROW_COUNTDOWN_HOURS hours left. At or
- * under that the familiar "mañana HH:MM" reading wins.
- */
-export const CAPSULE_TOMORROW_COUNTDOWN_HOURS = 3;
-
-/** Tomorrow label for the closed capsule: "Xh" or "mañana HH:MM". */
-export function formatTomorrowCapsuleLabel(
-  startsAt: Date,
-  now: Date,
-  startsLabel: string,
-): string {
-  const hours = wholeHoursUntil(startsAt, now);
-  return hours > CAPSULE_TOMORROW_COUNTDOWN_HOURS
-    ? `${hours}h`
-    : `mañana ${startsLabel}`;
-}
-
 export function minutesOf(date: Date): number {
   return date.getHours() * 60 + date.getMinutes();
 }

@@ -7,7 +7,6 @@ import {
   formatMinutes,
   formatProfessorLabel,
   formatRelativeTime,
-  formatTomorrowCapsuleLabel,
   freeMinutesBetween,
   getCurrentClass,
   getFreeGaps,
@@ -17,7 +16,6 @@ import {
   minutesOf,
   parseMinutes,
   shortenSubjectName,
-  wholeHoursUntil,
 } from "./utils";
 
 function meeting(partial: Partial<ClassMeeting>): ClassMeeting {
@@ -97,44 +95,6 @@ describe("class selection around the exact start minute", () => {
   it("keeps later classes visible until they finish", () => {
     const visible = getVisibleClasses(day, at(705), true);
     expect(visible.map((m) => m.clave)).toEqual(["B"]);
-  });
-});
-
-describe("wholeHoursUntil", () => {
-  // Monday 2026-08-24 at 10:00 local time.
-  const monday = new Date(2026, 7, 24, 10, 0, 0, 0);
-
-  it("counts whole hours between the instant and a later target", () => {
-    expect(wholeHoursUntil(new Date(2026, 7, 24, 16, 0), monday)).toBe(6);
-    expect(wholeHoursUntil(new Date(2026, 7, 24, 13, 30), monday)).toBe(3);
-    expect(wholeHoursUntil(new Date(2026, 7, 24, 10, 59), monday)).toBe(0);
-  });
-
-  it("goes negative once the target has passed", () => {
-    expect(wholeHoursUntil(new Date(2026, 7, 24, 9, 0), monday)).toBe(-1);
-  });
-});
-
-describe("formatTomorrowCapsuleLabel", () => {
-  // Monday 2026-08-24 at 20:00 local time.
-  const now = new Date(2026, 7, 24, 20, 0, 0, 0);
-
-  it("shows an hours countdown while there are more than 3 hours left", () => {
-    expect(
-      formatTomorrowCapsuleLabel(new Date(2026, 7, 25, 9, 0), now, "09:00"),
-    ).toBe("13h");
-    expect(
-      formatTomorrowCapsuleLabel(new Date(2026, 7, 25, 0, 10), now, "00:10"),
-    ).toBe("4h");
-  });
-
-  it("falls back to the mañana label at or under 3 hours", () => {
-    expect(
-      formatTomorrowCapsuleLabel(new Date(2026, 7, 24, 23, 0), now, "23:00"),
-    ).toBe("mañana 23:00");
-    expect(
-      formatTomorrowCapsuleLabel(new Date(2026, 7, 24, 21, 30), now, "21:30"),
-    ).toBe("mañana 21:30");
   });
 });
 

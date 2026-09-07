@@ -54,6 +54,30 @@ Reglas de uso:
   `backdrop-blur(20px) saturate(1.6)` + tinte semitransparente + brillo
   especular superior + anillo luminoso. Fallback sólido vía `@supports`.
   Reservado a: cápsula, navegación inferior, toast neutro.
+- `glass-panel-bare`: mismo glass **sin** el anillo de 1 px. Es la base de la
+  cápsula neutra (próxima clase, mañana / nos vemos el día, evento académico);
+  solo «En clase» lleva borde acento (`glass-panel-accent`).
+
+### Escala de cápsula (tipografía y espaciado)
+
+La cápsula no usa tamaños sueltos: se ancla a una escala propia con nombres de
+rol tipo Material, declarada en `@theme` en `src/index.css` y consumida como
+utilidades Tailwind (`text-capsule-*`, `gap-capsule-*`, `p-capsule-*`).
+
+| Token | Valor | Rol |
+| --- | --- | --- |
+| `--text-capsule-display-lg` | 30 px | flash: fase seguimiento |
+| `--text-capsule-display` | 24 px | flash: fase detalle |
+| `--text-capsule-title` | 20 px | titular "Mañana / Nos vemos el …" |
+| `--text-capsule-headline` | 18 px | salón al desplegar |
+| `--text-capsule-body` | 14 px | materia, salón |
+| `--text-capsule-caption` | 12 px | materia colapsada, profesor |
+| `--text-capsule-num-h-lg` / `-m-lg` / `-u-lg` | 30 / 22 / 13 px | contador grande: horas / minutos / unidad |
+| `--text-capsule-num-h` / `-m` / `-u` | 18 / 16 / 10 px | contador chico: horas / minutos / unidad |
+
+Espaciado: `--spacing-capsule-gap` 8 px, `--spacing-capsule-gap-lg` 10 px,
+`--spacing-capsule-pad` 20 px, `--spacing-capsule-pad-sm` 16 px,
+`--spacing-capsule-line-sm` 168 px (máximo de la materia colapsada).
 
 ## 3. Tipografía
 
@@ -86,25 +110,28 @@ desaparecieron; la barra inferior orienta la sección.
 | Estado | Tono | Contenido minimizado |
 | --- | --- | --- |
 | En clase | acento | contador de horas y minutos + salón a la derecha; debajo el nombre corto de la materia |
-| Próxima clase | neutro | contador de horas y minutos + salón |
+| Próxima clase | neutro | contador de horas y minutos + salón; debajo materia resumida |
+| Por hoy terminaste / Sin clases hoy | neutro | "mañana HH:MM" o "nos vemos el {día}"; sin clases en la semana → mensaje calmado |
+| Evento académico | neutro | título del evento + filas de detalle progresivas (detalle → consecuencia) |
 
-El contador jerarquiza por tamaño (no por color): la hora va grande y bold, la
-unidad "h" fino; los minutos a la mitad del tamaño y la "m" más chiquita aún.
-El salón se muestra crudo ("LB-24"), sin prefijo, en su misma línea y a la
-derecha de los números. La materia debajo usa un nombre resumido que cabe si
-el real es largo (`shortenSubjectName`, umbral 12 caracteres) y nunca envuelve.
-| Por hoy terminaste / Sin clases hoy | neutro | mensaje calmado (+ "mañana HH:MM" si hay clase) |
-| Evento académico | neutro | título del evento + dato clave |
+El contador jerarquiza por tamaño (no por peso): la hora va grande y
+`font-semibold`, la unidad "h" fino; los minutos a la mitad del tamaño y la
+"m" más chiquita aún. El salón se muestra crudo ("LB-24"), sin prefijo, en su
+misma línea a la derecha de los números y en `font-medium`: el blanco sobre el
+glass ya lo hace resaltar. La materia debajo usa un nombre resumido que cabe
+si el real es largo (`shortenSubjectName`, umbral 12 caracteres) y nunca
+envuelve.
 
 ### Expandido de clase (estado "En clase")
 
 El contenido minimizado **es** el contenido expandido: no hay un bloque de
-detalle aparte. Al expandir, el ancla (contador + salón + materia) se **escala
-×1.25 por transform** con el mismo layout — nunca se cambia el `font-size`, así
-la distribución no se re-fluye — y debajo de la materia aparece el profesor
-(solo apellidos si el dato llega en formato "Apellidos, Nombre",
-`formatProfessorLabel`) en su jerarquía de texto secundario. No se muestra
-"Termina a las".
+detalle aparte. Al expandir, el ancla (contador + salón + materia) cambia a una
+**variante tipográfica grande** (`minimizedExpanded`, layout real — nunca un
+`transform: scale`, que desbordaba el contenedor y despegaba el anillo del
+borde) y debajo de la materia aparece el profesor (solo apellidos si el dato
+llega en formato "Apellidos, Nombre", `formatProfessorLabel`) en su jerarquía
+de texto secundario. No se muestran horas de inicio ni de fin en
+ninguna cápsula: solo salón, profesor y materia.
 
 ### Expansión automática (solo eventos importantes)
 
@@ -139,22 +166,29 @@ evento real.
   la posición, al ser propiedad del transform, nunca la resetea React a mitad
   de camino.
 - El **ancla** (contador + salón + materia) se mantiene montado y no cambia de
-  contenido; al expandir se escala con un transform desde `top-left`.
-- La barra de progreso de la clase es un **borde SVG** (rect con
-  `vector-effect: non-scaling-stroke` + `pathLength`), posicionado `inset-0`
-  relativo a la cápsula para que siempre acompañe el borde; el radio del rect
-  anima en sincronía con el `border-radius` de la cápsula.
+  contenido; al expandir `stacked` se muestra una **variante tipográfica
+  grande** (`minimizedExpanded`), con layout real — así el contenedor crece
+  con su contenido y el anillo sigue pegado al borde sin overflow.
+- La barra de progreso de la clase es un **borde SVG**: dos `<path>` de medio
+  perímetro con `vector-effect: non-scaling-stroke` + `pathLength`,
+  posicionados `inset-0` relativo a la cápsula; ambos arrancan en el medio del
+  borde izquierdo y se llenan hacia arriba y abajo (el hueco se cierra en el
+  medio derecho). El radio del trazo es **estático por estado** (20 px
+  expandido, píldora colapsado): coincide con el `border-radius` de la cápsula
+  sin tweenearlo.
 
 ### Forma
 
 **Morf iOS**: círculo minimizado → tarjeta redondeada 20 px al expandir.
 Es la única variante; no hay toggle de forma.
 
-### Radio animable
+### Radio
 
-El radio nunca usa `9999px`: se calcula como la mitad de la altura medida
-(`border-radius: calc(h/2)`), así la interpolación ocurre entre valores px
-concretos y el morfo es limpio frame a frame.
+El radio se define por estado (clases `rounded-full` / `rounded-[20px]`) y
+**no se anima** (GSAP solo tweena la posición `x`): tweenear el radio de un
+elemento con `backdrop-filter` obliga al navegador a re-muestrear el desenfoque
+frame a frame, que se lee como el blur "animando". `border-radius: calc(h/2)`
+en píldora — nunca `9999px`.
 
 ## 5. Movimiento
 
@@ -163,7 +197,7 @@ transiciones CSS para micro-feedback. Sin librerías adicionales.
 
 | Momento | Tratamiento |
 | --- | --- |
-| Morfo de cápsula | GSAP tween geométrico `power3.out` 0.6 s (transform `x` compuesta + radio; el ancla se escala por `transform` sin reemplazarse) |
+| Morfo de cápsula | GSAP tween geométrico `power3.out` 0.6 s (transform `x` compuesta; el radio no se tweenea y el ancla `stacked` cambia a su variante grande sin reemplazarse) |
 | Desliz del indicador activo (barra inferior) | GSAP `translateX` `back.out(1.6)` 0.5 s; posiciona sin tween con `prefers-reduced-motion` |
 | Transición de contenido entre tabs | Salida `power2.in` 0.18 s (fade + subida), entrada `back.out(1.5)` 0.5 s (rise + rebote); líquida sobre un solo contenedor persistente |
 | Números héroe | contador GSAP `power3.out` 0.9 s (`AnimatedNumber`) |

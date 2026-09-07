@@ -17,7 +17,7 @@ import { toDateKey } from "@/features/auth/utils";
 import { GradesPage } from "@/features/grades/GradesPage";
 import { shouldOpenGradesFirst } from "@/features/grades/utils";
 import { NotificationsPage } from "@/features/notifications/NotificationsPage";
-import { getTomorrowFirstMeeting } from "@/features/schedule/capsuleState";
+import { getNextClassInfo } from "@/features/schedule/capsuleState";
 import { ScheduleStateProvider } from "@/features/schedule/ScheduleStateProvider";
 import { useScheduleState } from "@/features/schedule/scheduleStateContext";
 import { ScheduleCapsule } from "@/features/schedule/components/ScheduleCapsule";
@@ -72,8 +72,8 @@ function ContextCapsule({
     () => getScheduleForDay(resolvedWeek, now),
     [resolvedWeek, now],
   );
-  const tomorrowFirst = useMemo(
-    () => getTomorrowFirstMeeting(resolvedWeek, now),
+  const nextClassInfo = useMemo(
+    () => getNextClassInfo(resolvedWeek, now),
     [resolvedWeek, now],
   );
 
@@ -81,7 +81,7 @@ function ContextCapsule({
     <ScheduleCapsule
       meetings={todayMeetings}
       now={now}
-      tomorrowFirst={tomorrowFirst}
+      nextClassInfo={nextClassInfo}
       notification={notification}
       autoCollapseMs={collapseMs}
     />

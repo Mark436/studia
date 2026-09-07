@@ -91,39 +91,38 @@ export function toCapsuleTick(state: CapsuleViewModel): CapsuleTick {
   return { kind: state.kind };
 }
 
-export interface UpcomingClassInfo {
+export interface NextClassInfo {
+  /** Weekday (0–6) of the next class-bearing day after today. */
+  weekday: number;
   subjectName: string;
   startsLabel: string;
-  /** Absolute Date of that class on tomorrow (derived from `today`). */
-  startsAt: Date;
 }
 
-/** Earliest class of tomorrow, so a finished day still points forward. */
-export function getTomorrowFirstMeeting(
+/**
+ * First class of the next day that has classes (tomorrow at the earliest,
+ * scanning forward across the week). Null when the week has no more classes.
+ */
+export function getNextClassInfo(
   weekMeetings: readonly ClassMeeting[],
   today: Date,
-): UpcomingClassInfo | null {
-  const tomorrowWeekday = addDays(today, 1).getDay();
-  const candidates = weekMeetings
-    .filter((meeting) => meeting.weekday === tomorrowWeekday)
-    .sort((a, b) => a.startMinutes - b.startMinutes);
-  const first = candidates[0];
+): NextClassInfo | null {
+  for (let offset = 1; offset < 7; offset += 1) {
+    const weekday = addDays(today, offset).getDay();
+    const candidates = weekMeetings
+      .filter((meeting) => meeting.weekday === weekday)
+      .sort((a, b) => a.startMinutes - b.startMinutes);
+    const first = candidates[0];
 
-  if (!first) return null;
+    if (first) {
+      return {
+        weekday,
+        subjectName: first.subjectName,
+        startsLabel: formatMinutes(first.startMinutes),
+      };
+    }
+  }
 
-  const startsAt = addDays(today, 1);
-  startsAt.setHours(
-    Math.floor(first.startMinutes / 60),
-    first.startMinutes % 60,
-    0,
-    0,
-  );
-
-  return {
-    subjectName: first.subjectName,
-    startsLabel: formatMinutes(first.startMinutes),
-    startsAt,
-  };
+  return null;
 }
 
 /**
