@@ -21,6 +21,11 @@ export const PAGE_ENTER_EASE = "back.out(1.5)";
 export const CAPSULE_MORPH_DURATION = 0.6;
 export const CAPSULE_MORPH_EASE = "power3.out";
 
+// Collapse travels back a touch slower than the expansion, so leaving the
+// expanded card reads as deliberate rather than a snap.
+export const CAPSULE_COLLAPSE_DURATION = 0.8;
+export const CAPSULE_COLLAPSE_EASE = "power3.out";
+
 /** Capsule border-radius morph, tuned not to lag the Flip silhouette. */
 export const CAPSULE_RADIUS_DURATION = 0.5;
 export const CAPSULE_RADIUS_EASE = "power3.out";

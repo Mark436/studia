@@ -149,22 +149,28 @@ cuenta cruza T-1 min       → "one-minute"
 ### Secuencia de eventos académicos (canal cápsula)
 
 Calificaciones nuevas/cambiadas, adeudos y progreso llegan a la cápsula en dos
-fases: detalle (~2.2 s) → seguimiento (~2 s) → colapso. Ejemplo: "Nueva
-calificación · Redes · 9.5" y después "Promedio del periodo · 8.75". El canal
+fases: detalle (~0.8 s) → seguimiento (~0.7 s) → colapso (la ventana total es
+1.5 s antes de empezar a cerrarse). Ejemplo: "Nueva calificación · Redes · 9.5"
+y después "Promedio del periodo · 8.75". El canal
 es configurable en modo dev → Interacción ("Cápsula" / "Toast"); con toast los
 eventos usan el snackbar clásico. Ambos canales disparan una sola vez por
 evento real.
-- Auto-colapso tras `DEFAULT_CAPSULE_COLLAPSE_MS` (1500 ms); tap alterna manual
-  siempre y cancela el temporizador. Blur, toque fuera y Escape también
-  colapsan; la apertura manual igualmente programa su colapso.
+- Auto-colapso: la cápsula permanece abierta `DEFAULT_CAPSULE_COLLAPSE_MS`
+  (1500 ms) antes de empezar a cerrarse; tap alterna manual siempre y cancela
+  el temporizador. Blur, toque fuera y Escape también colapsan; la apertura
+  manual igualmente programa su colapso.
 - Al expandirse se **centra** horizontalmente; el morf viaja con una transform
   compuesta (`x`) calculada desde la posición inicial, nunca con `left`: el
   backdrop-blur del glass se mantiene rasterizado y constante durante todo el
   tween.
-- Colapso y expansión usan **la misma duración siempre**, sin importar qué lo
-  accione (tap, pulso automático, temporizador, Escape, blur o toque fuera):
-  la posición, al ser propiedad del transform, nunca la resetea React a mitad
-  de camino.
+- El **tamaño crece suave**, no de golpe: `width`/`height` son fit-content
+  (no interpolables), así que el crecimiento se anima vía el `padding` del
+  botón (sí interpolable, transición CSS 300 ms) y el expandido gana un
+  ancho mínimo (`min-w-64`, 16 rem). El radio sí permanece snap por estado
+  (constraint del `backdrop-filter`).
+- La apertura usa **0.6 s** `power3.out`; el colapso vuelve un poco más lento
+  (**0.8 s**), para que dejar la tarjeta se lea como deliberado. La posición,
+  al ser propiedad del transform, nunca la resetea React a mitad de camino.
 - El **ancla** (contador + salón + materia) se mantiene montado y no cambia de
   contenido; al expandir `stacked` se muestra una **variante tipográfica
   grande** (`minimizedExpanded`), con layout real — así el contenedor crece
@@ -197,7 +203,7 @@ transiciones CSS para micro-feedback. Sin librerías adicionales.
 
 | Momento | Tratamiento |
 | --- | --- |
-| Morfo de cápsula | GSAP tween geométrico `power3.out` 0.6 s (transform `x` compuesta; el radio no se tweenea y el ancla `stacked` cambia a su variante grande sin reemplazarse) |
+| Morfo de cápsula | GSAP tween geométrico `power3.out` (apertura 0.6 s, colapso 0.8 s; transform `x` compuesta; el radio no se tweenea y el ancla `stacked` cambia a su variante grande sin reemplazarse). El `padding` crece con transición CSS 300 ms (suaviza el fit-content) |
 | Desliz del indicador activo (barra inferior) | GSAP `translateX` `back.out(1.6)` 0.5 s; posiciona sin tween con `prefers-reduced-motion` |
 | Transición de contenido entre tabs | Salida `power2.in` 0.18 s (fade + subida), entrada `back.out(1.5)` 0.5 s (rise + rebote); líquida sobre un solo contenedor persistente |
 | Números héroe | contador GSAP `power3.out` 0.9 s (`AnimatedNumber`) |

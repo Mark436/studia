@@ -3,6 +3,8 @@ import type { FocusEvent, KeyboardEvent } from "react";
 import type { ReactNode } from "react";
 import gsap from "gsap";
 import {
+  CAPSULE_COLLAPSE_DURATION,
+  CAPSULE_COLLAPSE_EASE,
   CAPSULE_MORPH_DURATION,
   CAPSULE_MORPH_EASE,
 } from "@/lib/motion/eases";
@@ -96,9 +98,11 @@ function ringArcPaths(
 // rasterized and constant across the whole tween. The border-radius is NOT
 // animated (it snaps per state via classes): any radius tween forces the
 // browser to re-sample the backdrop-filter frame by frame, which reads as the
-// blur "animating". The anchor's position is owned by GSAP, so collapse
-// animates back with the exact same duration regardless of what triggered it
-// (tap, pulse, timer, Escape, blur or outside press).
+// blur "animating". Padding IS animated (interpolable), so the box grows
+// smoothly even though width/height are content-fit. The anchor's position is
+// owned by GSAP, so every collapse plays its full (slightly slower) duration
+// regardless of what triggered it (tap, pulse, timer, Escape, blur or outside
+// press).
 //
 // Expansion is always transient: it ends after autoCollapseMs, on Escape, on
 // focus leaving the island, or on a pointer press outside of it.
@@ -208,6 +212,8 @@ export function Capsule({
   // After React commits the new layout, travel to (or from) the centered
   // position. `x` is a composited transform: the backdrop filter never
   // re-renders frame-by-frame and every collapse plays the full duration.
+  // Collapse is a touch slower than the expansion so leaving reads as
+  // deliberate.
   useEffect(() => {
     const element = elementRef.current;
     if (element === null || reducedMotion) return;
@@ -220,8 +226,10 @@ export function Capsule({
 
     gsap.to(element, {
       x: targetX,
-      duration: CAPSULE_MORPH_DURATION,
-      ease: CAPSULE_MORPH_EASE,
+      duration: isExpanded
+        ? CAPSULE_MORPH_DURATION
+        : CAPSULE_COLLAPSE_DURATION,
+      ease: isExpanded ? CAPSULE_MORPH_EASE : CAPSULE_COLLAPSE_EASE,
       overwrite: "auto",
     });
   }, [isExpanded, reducedMotion]);
@@ -268,9 +276,9 @@ export function Capsule({
       aria-label={ariaLabel}
       className={`pointer-events-auto absolute z-30 select-none text-left ${positionClass} ${
         isExpanded
-          ? "max-w-[calc(100vw-1rem)] rounded-[20px] p-capsule-pad"
+          ? "max-w-[calc(100vw-1rem)] min-w-64 rounded-[20px] p-capsule-pad"
           : "min-h-12 rounded-full px-capsule-pad-sm"
-      } transition-opacity duration-150 ease-out active:opacity-80 ${
+      } transition-[padding,opacity] duration-300 ease-out active:opacity-80 ${
         tone === "accent" ? "glass-panel-accent" : "glass-panel-bare"
       } ${className ?? ""}`}
     >

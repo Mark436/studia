@@ -179,7 +179,8 @@ semana, queda el mensaje calmado y la app sigue funcionando.
 ### 5.5 Flash de evento académico — tono neutro, `stacked`
 
 Ruta `notification` (calificaciones nuevas, adeudos, progreso, reinscripción).
-Secuencia: detalle (~2.2 s) → seguimiento (~2 s) → colapso. Canal configurable
+Secuencia: detalle (~0.8 s) → seguimiento (~0.7 s) → colapso (ventana total
+1.5 s antes de empezar a cerrarse). Canal configurable
 (cápsula / toast) — mismo evento una sola vez.
 
 **Plegado** — el detalle deja de estar a la derecha: **filas apiladas que

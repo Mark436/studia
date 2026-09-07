@@ -26,8 +26,8 @@ interface ScheduleCapsuleProps {
   autoCollapseMs: number;
 }
 
-const DETAIL_STAGE_MS = 2200;
-const FLASH_TOTAL_MS = 4200;
+const DETAIL_STAGE_MS = 800;
+const FLASH_TOTAL_MS = 1500;
 
 type FlashStage = "detail" | "followup" | null;
 
