@@ -47,12 +47,24 @@ Copia `.env.example` como `.env` y configura `VITE_API_URL` cuando sea necesario
 VITE_API_URL=
 ```
 
-Con `VITE_API_URL` vacío, el cliente usa directamente el endpoint oficial de SITH.
-Para un entorno HTTPS o una configuración local con proxy, usa una URL como:
+Con `VITE_API_URL` vacío, el cliente usa directamente el endpoint oficial de SITH
+(HTTP plano; en Codespaces o HTTPS producirá CORS/mixed-content). Para un
+entorno HTTPS o una configuración local con proxy, usa una URL como:
 
 ```env
 VITE_API_URL=http://localhost:8888/api/sith
 ```
+
+En `pnpm dev` plano (sin `netlify dev`), `vite.config.ts` incluye un proxy que
+monta `/api/sith` → `http://sith.ith.mx/XTodo/wr`. Configura `.env` con:
+
+```env
+VITE_API_URL=/api/sith
+```
+
+Así el navegador llama a la misma origen (útil en Codespaces) y Vite proxea
+servidor a servidor, sin CORS. Esa ruta relativa también es la correcta en
+producción, donde la responde la Netlify Function en `/api/sith`.
 
 Inicia el frontend con:
 
@@ -60,9 +72,8 @@ Inicia el frontend con:
 pnpm dev
 ```
 
-Para probar la función de Netlify localmente, utiliza `netlify dev` y configura la
-URL anterior. En producción, `VITE_API_URL` normalmente apunta a
-`https://tu-sitio.netlify.app/api/sith`.
+Para probar la Netlify Function localmente, utiliza `netlify dev` con
+`VITE_API_URL=http://localhost:8888/api/sith`.
 
 ## Comandos
 

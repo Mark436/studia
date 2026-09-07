@@ -10,6 +10,16 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  server: {
+    proxy: {
+      "/api/sith": {
+        target: "http://sith.ith.mx/XTodo/wr",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api\/sith/, ""),
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),

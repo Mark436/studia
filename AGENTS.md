@@ -44,6 +44,14 @@ Copy or create a `.env` file when API configuration is needed:
 VITE_API_URL=
 ```
 
+For `pnpm dev` under Codespaces (or any non-`netlify dev` local run), use the
+dev-server proxy from `vite.config.ts` so the browser hits a same-origin path:
+`VITE_API_URL=/api/sith` (proxy: `/api/sith` → `http://sith.ith.mx/XTodo/wr`,
+dev-only). Production uses the same relative path served by the Netlify
+Function `netlify/functions/sith-proxy.mts`. With `VITE_API_URL` empty the
+client calls the official HTTP endpoint directly, which browsers block with
+CORS/mixed-content when the app is served over HTTPS (e.g. Codespaces URLs).
+
 ---
 
 ## Commands

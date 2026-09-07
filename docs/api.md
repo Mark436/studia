@@ -51,6 +51,12 @@ Browser (HTTPS)
 - Local development: either point `VITE_API_URL` at the deployed function
   (its CORS answers any origin by default) or run `netlify dev` for a fully
   local same-origin setup at `http://localhost:8888/api/sith`.
+- Dev server proxy (Codespaces / plain `pnpm dev`): `vite.config.ts` mounts
+  `/api/sith` → `http://sith.ith.mx/XTodo/wr` via `server.proxy`. With
+  `VITE_API_URL=/api/sith` the browser hits the same origin (the forwarded
+  Codespaces URL) and Vite proxies server-side, so neither CORS nor mixed
+  content applies. This proxy is dev-only; production keeps using the Netlify
+  function on the same relative path.
 - Proxy environment variables: `SITH_UPSTREAM_URL` (override upstream base)
   and `CORS_ALLOW_ORIGIN` (lock CORS to the site origin once deployed).
 
