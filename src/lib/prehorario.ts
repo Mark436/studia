@@ -15,17 +15,15 @@ export interface ResultadoPrehorarios {
   todos?: ArchivoListado[];
 }
 
-const FETCH_URL = import.meta.env.DEV
-  ? "/documentos/?C=M;O=D"
-  : "https://ith.mx/documentos/?C=M;O=D";
+// URL para fetch (proxy en producción, proxy de Vite en dev).
+const FETCH_URL = "/api/ith/documentos/?C=M;O=D";
 
+// URL base real del sitio ITH para resolver rutas relativas en el HTML devuelto.
 const SITIO_ITH = "https://ith.mx/";
 
 // El webmaster del ITH publica el calendario oficial vigente incrustado en
 // esta página (`<embed src>` y/o `<ul class="doc"><a href>`).
-const CALENDARIO_OFICIAL_URL = import.meta.env.DEV
-  ? "/calendario-escolar.html"
-  : "https://ith.mx/calendario-escolar.html";
+const CALENDARIO_OFICIAL_URL = "/api/ith/calendario-escolar.html";
 
 export function extraerAnio(archivo: string): number | null {
   const match = archivo.match(/20\d{2}/);
@@ -97,7 +95,7 @@ export async function obtenerCalendarioOficial(): Promise<CalendarioOficial | nu
 }
 
 export function urlDocumento(archivo: string): string {
-  return `https://ith.mx/documentos/${encodeURIComponent(archivo)}`;
+  return `/api/ith/documentos/${encodeURIComponent(archivo)}`;
 }
 
 export function urlPrehorario(archivo: string): string {

@@ -108,29 +108,27 @@ interface AttendTarget {
   x?: number;
 }
 
-const EXPANDED_RADIUS_PX = 20;
-const RING_STROKE_PX = 2;
-const RING_INSET_PX = 1;
+const PROGRESS_STROKE_PX = 2;
+const PROGRESS_INSET_PX = 1;
 
 /**
- * Progress ring geometry for the capsule box (single rounded rect, drawn as a
- * closed path so `pathLength` + `strokeDasharray` fill it clockwise from the
- * top-left). A rounded rect — not two hand-built arcs — stays glued to the
- * border because GSAP can tween its x/y/width/height/rx attributes in one
- * pass while the capsule morphs, so the ring resizes with the box instead of
- * lagging behind it.
+ * Progress line geometry: two horizontal lines (top and bottom) that fill
+ * from left to right. Returns coordinates for both lines.
  */
-function ringAttrs(
+function progressLineAttrs(
   width: number,
   height: number,
-  radius: number,
-): Record<"x" | "y" | "width" | "height" | "rx", number> {
+): {
+  top: { x1: number; y1: number; x2: number; y2: number };
+  bottom: { x1: number; y1: number; x2: number; y2: number };
+} {
+  const inset = PROGRESS_INSET_PX;
+  const innerWidth = Math.max(0, width - 2 * inset);
+  const yTop = inset;
+  const yBottom = Math.max(inset, height - inset);
   return {
-    x: RING_INSET_PX,
-    y: RING_INSET_PX,
-    width: Math.max(0, width - RING_STROKE_PX),
-    height: Math.max(0, height - RING_STROKE_PX),
-    rx: Math.max(0, radius),
+    top: { x1: inset, y1: yTop, x2: inset + innerWidth, y2: yTop },
+    bottom: { x1: inset, y1: yBottom, x2: inset + innerWidth, y2: yBottom },
   };
 }
 
@@ -162,12 +160,13 @@ export function Capsule({
   className,
 }: CapsuleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [ringSize, setRingSize] = useState<{
+  const [progressSize, setProgressSize] = useState<{
     width: number;
     height: number;
   } | null>(null);
   const elementRef = useRef<HTMLButtonElement>(null);
-  const ringRectRef = useRef<SVGRectElement>(null);
+  const topLineRef = useRef<SVGLineElement>(null);
+  const bottomLineRef = useRef<SVGLineElement>(null);
   const collapseTimerRef = useRef<number | undefined>(undefined);
   const previousPulseRef = useRef(pulseKey);
   const previousPopKeyRef = useRef(popKey);
@@ -395,17 +394,23 @@ export function Capsule({
       },
     });
 
-    // Keep the progress ring glued to the border: tween its rounded-rect
-    // geometry on the same clock as the box so it never lags the silhouette.
-    // (Only the child rect's rx tween is animated — the button's own radius
-    // still snaps via classes, so the backdrop blur is never re-sampled.)
-    if (ringRectRef.current !== null) {
-      gsap.to(ringRectRef.current, {
-        attr: ringAttrs(
-          targetWidth,
-          targetHeight,
-          isExpanded ? EXPANDED_RADIUS_PX : targetHeight / 2,
-        ),
+    // Keep the progress lines glued to the border: tween their coordinates
+    // on the same clock as the box so they never lag the silhouette.
+    if (topLineRef.current !== null && bottomLineRef.current !== null) {
+      const { top, bottom } = progressLineAttrs(
+        targetWidth,
+        targetHeight,
+      );
+      gsap.to(topLineRef.current, {
+        attr: top,
+        duration: isExpanded
+          ? CAPSULE_MORPH_DURATION
+          : CAPSULE_COLLAPSE_DURATION,
+        ease: isExpanded ? CAPSULE_MORPH_EASE : CAPSULE_COLLAPSE_EASE,
+        overwrite: "auto",
+      });
+      gsap.to(bottomLineRef.current, {
+        attr: bottom,
         duration: isExpanded
           ? CAPSULE_MORPH_DURATION
           : CAPSULE_COLLAPSE_DURATION,
@@ -490,13 +495,16 @@ export function Capsule({
         );
       }
 
-      if (ringRectRef.current !== null) {
-        gsap.to(ringRectRef.current, {
-          attr: ringAttrs(
-            targetWidth,
-            targetHeight,
-            isExpanded ? EXPANDED_RADIUS_PX : targetHeight / 2,
-          ),
+      if (topLineRef.current !== null && bottomLineRef.current !== null) {
+        const { top, bottom } = progressLineAttrs(targetWidth, targetHeight);
+        gsap.to(topLineRef.current, {
+          attr: top,
+          duration: CAPSULE_ATTEND_DURATION,
+          ease: CAPSULE_ATTEND_EASE,
+          overwrite: "auto",
+        });
+        gsap.to(bottomLineRef.current, {
+          attr: bottom,
           duration: CAPSULE_ATTEND_DURATION,
           ease: CAPSULE_ATTEND_EASE,
           overwrite: "auto",
@@ -625,19 +633,19 @@ export function Capsule({
   // progress rect's `rx` is tweened (SVG, no blur), so the ring hugs the border
   // through the morph while the glass stays rasterized.
 
-  // Track the capsule box so the ring hugs its border at every size. Updates
+  // Track the capsule box so the progress lines hug its border at every size. Updates
   // are skipped while the morph tween runs (the box size is in flight); the
-  // final RestoreObserver read lands once sizing returns to auto.
+  // final ResizeObserver read lands once sizing returns to auto.
   useEffect(() => {
     const element = elementRef.current;
     if (element === null || progressPercent === undefined) {
-      setRingSize(null);
+      setProgressSize(null);
       return;
     }
 
     const update = () => {
       if (morphingRef.current) return;
-      setRingSize({ width: element.offsetWidth, height: element.offsetHeight });
+      setProgressSize({ width: element.offsetWidth, height: element.offsetHeight });
     };
     update();
 
@@ -650,9 +658,7 @@ export function Capsule({
     reducedMotion && isExpanded ? "left-1/2 -translate-x-1/2" : "left-0";
 
   const progress = Math.min(Math.max(progressPercent ?? 0, 0), 100);
-  const ringRadius = isExpanded
-    ? EXPANDED_RADIUS_PX
-    : (ringSize?.height ?? 0) / 2;
+  const inset = PROGRESS_INSET_PX;
 
   return (
     <button
@@ -676,17 +682,31 @@ export function Capsule({
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 h-full w-full"
         >
-          {ringSize !== null && ringSize.width > 0 && ringSize.height > 0 ? (
-            <rect
-              ref={ringRectRef}
-              {...ringAttrs(ringSize.width, ringSize.height, ringRadius)}
-              fill="none"
-              stroke="var(--studia-cobalto)"
-              strokeWidth={RING_STROKE_PX}
-              vectorEffect="non-scaling-stroke"
-              pathLength={100}
-              strokeDasharray={`${progress} ${100 - progress}`}
-            />
+          {progressSize !== null && progressSize.width > 0 && progressSize.height > 0 ? (
+            <>
+              <line
+                ref={topLineRef}
+                x1={inset}
+                y1={inset}
+                x2={inset + progressSize.width * (progress / 100) - inset}
+                y2={inset}
+                stroke="var(--studia-cobalto)"
+                strokeWidth={PROGRESS_STROKE_PX}
+                vectorEffect="non-scaling-stroke"
+                strokeLinecap="round"
+              />
+              <line
+                ref={bottomLineRef}
+                x1={inset}
+                y1={progressSize.height - inset}
+                x2={inset + progressSize.width * (progress / 100) - inset}
+                y2={progressSize.height - inset}
+                stroke="var(--studia-cobalto)"
+                strokeWidth={PROGRESS_STROKE_PX}
+                vectorEffect="non-scaling-stroke"
+                strokeLinecap="round"
+              />
+            </>
           ) : null}
         </svg>
       ) : null}

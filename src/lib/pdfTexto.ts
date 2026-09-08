@@ -10,13 +10,13 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?worker&url";
 
 /**
  * URL para descargar un PDF del repositorio del instituto (calendario,
- * prehorario, programación, …): en dev pasa por el proxy de vite (mismo
- * origen) y en producción va directo a `ith.mx`.
+ * prehorario, programación, …): en dev y producción pasa por el proxy
+ * de Netlify Function `/api/ith/` para evitar CORS.
  */
 export function urlDocumentoPdf(archivo: string): string {
   const ruta = `/documentos/${encodeURIComponent(archivo)}`;
 
-  return import.meta.env.DEV ? ruta : `https://ith.mx${ruta}`;
+  return `/api/ith${ruta}`;
 }
 
 /**

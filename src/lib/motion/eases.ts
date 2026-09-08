@@ -21,11 +21,11 @@ export const PAGE_ENTER_EASE = "back.out(1.5)";
 export const CAPSULE_MORPH_DURATION = 0.6;
 export const CAPSULE_MORPH_EASE = "power3.out";
 
-// Collapse is the exact reverse of the expansion: same duration, ease mirrored
-// in time (power3.in is the reverse of power3.out), so closing reads as the
-// opening played backward instead of a separate, slower motion.
-export const CAPSULE_COLLAPSE_DURATION = 0.6;
-export const CAPSULE_COLLAPSE_EASE = "power3.in";
+// Collapse is slightly faster and snappier than expand: it should feel
+// decisive, not sluggish. power2.inOut gives a quick start and clean stop
+// without the "sticky" feel of power3.in.
+export const CAPSULE_COLLAPSE_DURATION = 0.45;
+export const CAPSULE_COLLAPSE_EASE = "power2.inOut";
 
 // Transient flash announce (collapsed capsule grows to fit a new alert):
 // bouncy so the size change reads as an event, not a layout jump. The
