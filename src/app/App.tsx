@@ -433,32 +433,24 @@ function AuthenticatedShell() {
     return () => window.clearTimeout(timer);
   }, [capsuleNotification]);
 
-  // Dev-only test event: sends a custom alert through whichever in-app channel
-// is selected in Ajustes (capsule or toast) and optionally fires a real
-// system push, so every surface can be exercised without waiting for a real
-// fetch change.
-const sendTestNotification = useCallback(
-  (draft: NotificationDraft, withSystemPush: boolean) => {
-    if (notificationChannel === "capsule") {
+  // Dev-only test event: always routed through the capsule channel so the
+  // flash can be exercised regardless of the user's notification channel,
+  // plus an optional real system push.
+  const sendTestNotification = useCallback(
+    (draft: NotificationDraft, withSystemPush: boolean) => {
       setCapsuleNotification(
         toCapsuleNotification(draft, `dev-test:${Date.now()}`),
       );
-    } else {
-      showToast(
-        [draft.title, draft.conclusion].filter(Boolean).join(". "),
-        "neutral",
-      );
-    }
 
-    if (withSystemPush) {
-      void sendPushNotificationTest({
-        title: draft.title,
-        body: [draft.conclusion, draft.detail].filter(Boolean).join("\n"),
-      }).catch(() => undefined);
-    }
-  },
-  [notificationChannel, showToast],
-);
+      if (withSystemPush) {
+        void sendPushNotificationTest({
+          title: draft.title,
+          body: [draft.conclusion, draft.detail].filter(Boolean).join("\n"),
+        }).catch(() => undefined);
+      }
+    },
+    [],
+  );
 
   return (
     <ScheduleStateProvider alumno={effectiveAlumno}>
@@ -474,9 +466,7 @@ const sendTestNotification = useCallback(
         topSlot={
           <ContextCapsule
             collapseMs={capsuleCollapseMs}
-            notification={
-              notificationChannel === "capsule" ? capsuleNotification : null
-            }
+            notification={capsuleNotification}
           />
         }
       >

@@ -5,9 +5,9 @@ import { Switch } from "@/components/ui/Switch";
 import type { NotificationDraft } from "@/lib/notifications/capsuleEvents";
 
 // Dev-only test affordance: compose a custom alert (title + detail +
-// conclusion) and fire it through the channel selected in Ajustes, optionally
-// plus a real system push — so the flash and the push expansion can be
-// exercised without waiting for a real fetch change.
+// conclusion) and fire it through the capsule (regardless of the selected
+// channel), optionally plus a real system push — so the flash and the push
+// expansion can be exercised without waiting for a real fetch change.
 export function InteractionSection({
   onSendTestNotification,
 }: {
@@ -48,7 +48,7 @@ export function InteractionSection({
       />
       <Switch
         label="Incluir push del sistema"
-        description="Además del canal seleccionado en Ajustes (cápsula o toast)."
+        description="Además del aviso en la cápsula."
         checked={withSystemPush}
         onChange={setWithSystemPush}
       />
@@ -70,7 +70,7 @@ export function InteractionSection({
         Enviar notificación de prueba
       </Button>
       <p className="text-xs text-on-surface-variant">
-        Con canal cápsula se muestra el título y la conclusión plegados, y el
+        Siempre se muestra en la cápsula: título y conclusión plegados, y el
         detalle al expandir; el push del sistema usa el mismo contenido.
       </p>
     </section>
