@@ -373,7 +373,7 @@ Fuente de verdad: [`docs/design.md`](docs/design.md).
 - [x] Variantes A/B de cápsula con toggle en modo dev + slider de colapso.
 - [x] Cápsula persistente en todo el shell (`ContextCapsule` vía `topSlot`); expansión centrada.
 - [x] Estado compartido del horario (`ScheduleStateProvider`) entre cápsula y página.
-- [x] Canal de avisos cápsula/toast: calificación nueva → detalle y luego promedio; adeudos y progreso.
+- [x] Canal de avisos cápsula/toast: el flash es un solo aviso transitorio (título + conclusión colapsada, detalle al expandir; pop bouncy + parpadeo al llegar, auto-clear 10 s); calificación nueva, adeudos, progreso y reinscripción.
 - [x] Promedios con máximo 2 decimales (`formatAverage` + `AnimatedNumber`).
 - [x] Headers de página retirados; la barra inferior orienta la sección.
 - [x] Números héroe animados (promedios, progreso) con GSAP.

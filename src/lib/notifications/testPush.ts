@@ -6,11 +6,18 @@ export type PushNotificationTestOutcome =
   | "permission-denied"
   | "failed";
 
-const TEST_TITLE = "Studia · Prueba push";
-const TEST_BODY = "Esta es una notificación push de prueba.";
+const DEFAULT_TITLE = "Studia · Prueba push";
+const DEFAULT_BODY = "Esta es una notificación push de prueba.";
 const TEST_TAG = "dev-push-test";
 
-export async function sendPushNotificationTest(): Promise<PushNotificationTestOutcome> {
+export interface PushNotificationTestOptions {
+  title?: string;
+  body?: string;
+}
+
+export async function sendPushNotificationTest(
+  options: PushNotificationTestOptions = {},
+): Promise<PushNotificationTestOutcome> {
   if (typeof Notification === "undefined") return "unsupported";
 
   if (Notification.permission === "denied") return "permission-denied";
@@ -19,8 +26,10 @@ export async function sendPushNotificationTest(): Promise<PushNotificationTestOu
     if (!granted) return "permission-denied";
   }
 
-  const options: NotificationOptions = {
-    body: TEST_BODY,
+  const title = options.title?.trim() || DEFAULT_TITLE;
+  const body = options.body?.trim() || DEFAULT_BODY;
+  const notificationOptions: NotificationOptions = {
+    body,
     tag: TEST_TAG,
     icon: "/icon-192.png",
   };
@@ -35,7 +44,7 @@ export async function sendPushNotificationTest(): Promise<PushNotificationTestOu
   }
   if (activeRegistration !== undefined) {
     try {
-      await activeRegistration.showNotification(TEST_TITLE, options);
+      await activeRegistration.showNotification(title, notificationOptions);
       return "shown";
     } catch {
       activeRegistration = undefined;
@@ -43,7 +52,7 @@ export async function sendPushNotificationTest(): Promise<PushNotificationTestOu
   }
 
   try {
-    new Notification(TEST_TITLE, options);
+    new Notification(title, notificationOptions);
     return "shown";
   } catch {
     return "failed";

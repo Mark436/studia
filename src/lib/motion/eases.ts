@@ -21,10 +21,25 @@ export const PAGE_ENTER_EASE = "back.out(1.5)";
 export const CAPSULE_MORPH_DURATION = 0.6;
 export const CAPSULE_MORPH_EASE = "power3.out";
 
-// Collapse travels back a touch slower than the expansion, so leaving the
-// expanded card reads as deliberate rather than a snap.
-export const CAPSULE_COLLAPSE_DURATION = 0.8;
-export const CAPSULE_COLLAPSE_EASE = "power3.out";
+// Collapse is the exact reverse of the expansion: same duration, ease mirrored
+// in time (power3.in is the reverse of power3.out), so closing reads as the
+// opening played backward instead of a separate, slower motion.
+export const CAPSULE_COLLAPSE_DURATION = 0.6;
+export const CAPSULE_COLLAPSE_EASE = "power3.in";
+
+// Transient flash announce (collapsed capsule grows to fit a new alert):
+// bouncy so the size change reads as an event, not a layout jump. The
+// blink (a quick opacity flicker) rides on the same pop.
+export const CAPSULE_FLASH_DURATION = 0.6;
+export const CAPSULE_FLASH_EASE = "back.out(2)";
+
+// Content swap while the capsule stays in the same state (the "size attend"
+// tracker in Capsule.tsx): a short, quiet tween so the box follows a new
+// natural size instead of hopping. Discreet on purpose — content changes are
+// layout upkeep, not events. Once `interpolate-size` is broadly supported
+// this JS tracker goes away and a plain CSS height transition covers it.
+export const CAPSULE_ATTEND_DURATION = 0.3;
+export const CAPSULE_ATTEND_EASE = "power2.out";
 
 /** Capsule border-radius morph, tuned not to lag the Flip silhouette. */
 export const CAPSULE_RADIUS_DURATION = 0.5;

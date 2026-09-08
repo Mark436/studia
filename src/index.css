@@ -196,6 +196,12 @@ body {
 /* Motion vocabulary. Springs live in GSAP (capsule, counters); these ease
    plain CSS transitions. */
 :root {
+  /* Modern-browser groundwork for the capsule "size attend": makes `auto`
+     interpolable inside transitions, so a CSS `height` transition could keep
+     the capsule from hopping once GSAP-sized animation is retired. Ignored by
+     older engines — the JS attend tracker in Capsule.tsx covers those. */
+  interpolate-size: allow-keywords;
+
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
   /* Signature glide for larger surfaces (cards entering, sheets). */
   --ease-glide: cubic-bezier(0.32, 0.72, 0, 1);

@@ -12,12 +12,16 @@ import { ReinscripcionCard } from "./components/ReinscripcionCard";
 import { UNLOCK_TAP_COUNT } from "@/features/devtools/config";
 import type { DevToolsController } from "@/features/devtools/useDevConfig";
 import type { Alumno } from "@/lib/api/client";
+import type { NotificationDraft } from "@/lib/notifications/capsuleEvents";
 
 interface StudentPageProps {
   alumno: Alumno | null;
   onRequestRefresh: () => void;
   onShowToast?: (message: string, variant: ToastVariant) => void;
-  onSendTestNotification?: () => void;
+  onSendTestNotification?: (
+    draft: NotificationDraft,
+    withSystemPush: boolean,
+  ) => void;
   onOpenSettings: () => void;
   onLogout: () => void;
   dev?: DevToolsController;

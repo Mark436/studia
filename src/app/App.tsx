@@ -33,8 +33,16 @@ import {
   parseEstadoChequeo,
   tocaAvisarTurnosReinscripcion,
 } from "@/lib/busquedaHorarios";
-import type { CapsuleNotification } from "@/lib/notifications/capsuleEvents";
+import type {
+  CapsuleNotification,
+  NotificationDraft,
+} from "@/lib/notifications/capsuleEvents";
+import {
+  CAPSULE_FLASH_LIFETIME_MS,
+  toCapsuleNotification,
+} from "@/lib/notifications/capsuleEvents";
 import { REINSCRIPCION_ALERT_MESSAGES } from "@/lib/notifications/reinscripcion";
+import { parseReinscripcionDate } from "@/lib/notifications/reinscripcion";
 import { sendPushNotificationTest } from "@/lib/notifications/testPush";
 import {
   getSetting,
@@ -57,6 +65,20 @@ import type { TabId } from "./navigation";
 // A session older than this gets one gentle reminder per day suggesting a
 // pull-to-refresh; the re-auth sheet itself only appears on demand.
 const STALE_SESSION_NUDGE_MS = 23 * 60 * 60 * 1000;
+
+const REINS_DATE_FORMATTER = new Intl.DateTimeFormat("es-MX", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+const REINS_TIME_FORMATTER = new Intl.DateTimeFormat("es-MX", {
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+function formatReinscripcionDate(fecha: Date): string {
+  return `${REINS_DATE_FORMATTER.format(fecha)} a las ${REINS_TIME_FORMATTER.format(fecha)}`;
+}
 
 interface ActiveToast {
   id: number;
@@ -338,26 +360,34 @@ function AuthenticatedShell() {
       setCapsuleNotification({
         id: `adeudo:${adeudoAlertCount}`,
         title: "Adeudo nuevo",
-        detail: "Revisa la alerta en tu pantalla.",
+        detail: "Revisa la lista de deudas en tu perfil.",
+        conclusion: "Tienes un adeudo nuevo pendiente.",
       });
     } else if (
       reinscripcionAlertCount > previous.reinscripcion &&
       lastReinscripcionAlert !== null
     ) {
+      const fecha = parseReinscripcionDate(effectiveAlumno);
       setCapsuleNotification({
         id: `reinscripcion:${reinscripcionAlertCount}`,
         title: "Reinscripción",
-        detail: REINSCRIPCION_ALERT_MESSAGES[lastReinscripcionAlert],
+        detail: fecha !== null ? `Empieza el ${formatReinscripcionDate(fecha)}.` : undefined,
+        conclusion: REINSCRIPCION_ALERT_MESSAGES[lastReinscripcionAlert],
       });
     } else if (
       progressAlertCount > previous.progress &&
       lastProgressGain !== null &&
       lastProgressGain > 0
     ) {
+      const progreso = Number.isFinite(effectiveAlumno?.progreso)
+        ? Math.round((effectiveAlumno?.progreso ?? 0) * 10) / 10
+        : null;
       setCapsuleNotification({
         id: `progreso:${progressAlertCount}`,
         title: "Progreso de carrera",
-        detail: `Avanzaste ${formatProgressDelta(lastProgressGain)}.`,
+        detail:
+          progreso !== null ? `Tu progreso actual es ${progreso}%.` : undefined,
+        conclusion: `Avanzaste ${formatProgressDelta(lastProgressGain)}.`,
       });
     } else if (gradeChangeCount > previous.grades) {
       const flash = pendingGradeFlashRef.current;
@@ -365,8 +395,7 @@ function AuthenticatedShell() {
         id: `grado:${gradeChangeCount}`,
         title: flash?.title ?? "Calificaciones actualizadas",
         detail: flash?.detail,
-        followUpTitle: "Promedio del periodo",
-        followUpDetail: formatAverage(effectiveAlumno?.boleta.promedio),
+        conclusion: `Promedio · ${formatAverage(effectiveAlumno?.boleta.promedio)}`,
       });
     }
 
@@ -392,24 +421,44 @@ function AuthenticatedShell() {
     setReAuthOpen(true);
   }
 
-  // Dev-only test event: fires a real system push notification and uses
-  // whichever in-app channel is selected in the panel, so every surface can
-  // be exercised without waiting for a real fetch change.
-  const sendTestNotification = useCallback(() => {
-    void sendPushNotificationTest().catch(() => undefined);
+  // The capsule flash is transient (never eternal): it clears itself after
+  // CAPSULE_FLASH_LIFETIME_MS so the capsule returns to the schedule context
+  // even if no newer event replaces it.
+  useEffect(() => {
+    if (capsuleNotification === null) return;
+    const timer = window.setTimeout(
+      () => setCapsuleNotification(null),
+      CAPSULE_FLASH_LIFETIME_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [capsuleNotification]);
 
+  // Dev-only test event: sends a custom alert through whichever in-app channel
+// is selected in Ajustes (capsule or toast) and optionally fires a real
+// system push, so every surface can be exercised without waiting for a real
+// fetch change.
+const sendTestNotification = useCallback(
+  (draft: NotificationDraft, withSystemPush: boolean) => {
     if (notificationChannel === "capsule") {
-      setCapsuleNotification({
-        id: `dev-test:${Date.now()}`,
-        title: "Notificación de prueba",
-        detail: "Canal de cápsula funcionando",
-        followUpTitle: "Resumen",
-        followUpDetail: "Siguiente evento de prueba",
-      });
+      setCapsuleNotification(
+        toCapsuleNotification(draft, `dev-test:${Date.now()}`),
+      );
     } else {
-      showToast("Notificación de prueba desde modo dev", "neutral");
+      showToast(
+        [draft.title, draft.conclusion].filter(Boolean).join(". "),
+        "neutral",
+      );
     }
-  }, [notificationChannel, showToast]);
+
+    if (withSystemPush) {
+      void sendPushNotificationTest({
+        title: draft.title,
+        body: [draft.conclusion, draft.detail].filter(Boolean).join("\n"),
+      }).catch(() => undefined);
+    }
+  },
+  [notificationChannel, showToast],
+);
 
   return (
     <ScheduleStateProvider alumno={effectiveAlumno}>

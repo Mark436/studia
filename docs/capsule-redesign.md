@@ -50,17 +50,23 @@ Expandido (`stacked`):
 
 ### Fase 4 — Barra de progreso como borde SVG
 
-- Se reemplazó la máscara CSS del borde-progreso por dos `<path>` de medio
-  perímetro con `vector-effect: non-scaling-stroke` y `pathLength`, dentro de
-  un `<g>` posicionado `inset-0` relativo a la cápsula (siempre pegado al
-  borde).
-- Dirección de revelado (decidido por el usuario): ambos arcos arrancan en el
-  **medio del borde izquierdo** y se llenan a la vez hacia arriba y abajo;
-  el hueco se cierra en el medio del borde derecho.
-- El radio del arco coincide con el de la cápsula (`EXPANDED_RADIUS_PX` 20 en
-  expandido; `height/2` en píldora) y es **estático por estado** — no se
-  tweena (Fase 1), así el trazo tiene la forma píldora/card correcta en
-  cualquier pantalla.
+- Se reemplazó la máscara CSS del borde-progreso por un **`<rect>` SVG
+  redondeado** con `vector-effect: non-scaling-stroke`, `pathLength` y
+  `strokeDasharray`, dentro de un `<svg>` `inset-0` relativo a la cápsula
+  (siempre pegado al borde).
+- La geometría del rect (x/y/width/height/rx) se tweena con GSAP **en el
+  mismo reloj que el morf de la caja** (y que el size-attend), así el anillo
+  acompaña la silueta frame a frame en vez de quedarse en el tamaño viejo y
+  "pegar" al final (ver Fase 6).
+- Dirección de revelado: el rect se llena en la orientación de su `<path>`
+  (desde la esquina superior izquierda hacia la derecha, en el sentido de las
+  agujas del reloj); el hueco-terminal se cierra cerca de la esquina superior
+  izquierda. VOLVIÓ al rect anterior a petición del usuario — la variante de
+  dos arcos con fuga en el medio derecho queda descartada por ahora (cambia
+  el arranque visual del anillo en morphs de tamaño).
+- El radio coincide con el de la cápsula (`EXPANDED_RADIUS_PX` 20 en
+  expandido; `height/2` en píldora). Solo el `rx` del rect se tweena — es SVG
+  sin `backdrop-filter`, así el blur del glass nunca se re-muestrea.
 
 ### Fase 5 — Tokens de escala y cápsula neutra sin borde
 
@@ -78,6 +84,33 @@ Expandido (`stacked`):
 - La cápsula neutra (upcoming / done / empty / flash) usa
   `glass-panel-bare`: mismo glass, sin el anillo de 1 px. Solo «En clase»
   conserva el borde acento (`glass-panel-accent`).
+
+### Fase 6 — Morf sin saltos de altura
+
+- El salto al final del morf venía del `transition-[padding,opacity]`
+  declarado en la clase: al medir el destino, la transición recién empezada
+  reporta el padding de la posición de salida, el tween queda corto y la caja
+  "pega" al final. Ahora el morf desactiva la transición inline (la restaura
+  como `""` al terminar, para que la clase siga mandando), mide con el layout
+  objetivo y anima `paddingTop/Right/Bottom/Left` con GSAP en sincronía con
+  `width`/`height`.
+- El pop del flash también desactiva la transición durante su tween: el blink
+  de opacidad es por-frame y el `transition-[opacity]` de la clase lo doblaría.
+- El flash, al limpiarse (vida útil de 10 s), **vuelve** al tamaño del pill del
+  horario con un settle suave (`CAPSULE_COLLAPSE_DURATION/EASE`, sin blink) en
+  vez de cambiar de contenido con un salto.
+- **Size attend**: cuando el CONTENIDO cambia sin cambiar de estado (el pill
+  "Xh" → "mañana HH:MM", el flash relevando al pill, el bloque expandido
+  creciendo, un reflow del contenedor), el tamaño natural cambia y no hay
+  toggle que lo anime — saltaba. Un `ResizeObserver` sobre la cápsula re-mide
+  y viaja al nuevo tamaño natural con un tween corto y discreto
+  (`CAPSULE_ATTEND_DURATION 0.3 s`, `power2.out`). Se salta mientras el morf
+  o el pop es dueño de la caja. El anillo SVG se tweenea igual para que no
+  lag.
+- `interpolate-size: allow-keywords` en `index.css` hace `auto` interpolable
+  en los navegadores que lo soportan: es el camino CSS moderno. Cuando el
+  soporte sea amplio se **retira el tracker JS** y una transición CSS de
+  altura cubre los mismos swaps (anotado en Pendientes).
 
 ## 5. Estados de la cápsula — inventario (plegado / desplegado)
 
@@ -163,44 +196,59 @@ semana, queda el mensaje calmado y la app sigue funcionando.
   lunes"), `text-capsule-body font-semibold text-primary-strong`.
 - Sin clases en la semana → `Consulta otro día desde tu horario.`
   (`text-capsule-body font-medium text-on-surface-variant`).
+ 
 
-**Desplegado:**
-- Mantiene el mensaje del plegado grande (`font-display text-capsule-title
-  font-bold`): `Mañana HH:MM` / `Nos vemos el {día}`.
-- Debajo: la referencia al día (`mañana` o el nombre del día,
-  `text-capsule-caption uppercase tracking`) y bajo ella la **materia resumida**
-  (`shortenSubjectName`) con su hora (`text-capsule-body`, materia en
-  `font-semibold text-on-surface`).
+**Desplegado:** CAMBIOS HECHOS — ahora es `stacked`, siguiendo la lógica de las
+otras cápsulas: el ancla (`minimizedExpanded`) es el contenido del plegado en
+variante tipográfica grande, sin repetir `mañana`/día abajo (ya fecha el
+plegado; se eliminó la línea de referencia al día que duplicaba el dato).
+- Ancla (`minimizedExpanded`): mensaje del plegado grande `font-display
+  text-capsule-title font-bold`: `Mañana HH:MM` / `Nos vemos el {día}`.
+- Bloque desplegado (`expanded`): materia (`subjectName` completa) y salón
+  (`formatClassroomLabel`), `text-capsule-body`, materia en `font-semibold
+  text-on-surface`, salón `text-on-surface-variant`, separados por " · ", todo
+  `truncate`. **Sin la hora**: ya está en el plegado y en el ancla.
 - Sin clases en la semana → solo el mensaje `Consulta otro día desde tu
-  horario.`.
-- CAMBIOS HECHOS (ajustable): sin horas, `mañana` / `nos vemos el día`,
-  mensaje + día + materia resumida al desplegar.
+  horario.` (sin bloque extra al desplegar).
+- CAMBIOS HECHOS (ajustable): migrado a `stacked`; ancla grande del mensaje
+  del plegado; sin la referencia al día duplicada; materia + salón abajo (sin
+  hora, que ya vive en el plegado/ancla); la lógica de "ancla = plegado en
+  grande, bloque = solo dato nuevo" se mantiene en todas las cápsulas.
 
 ### 5.5 Flash de evento académico — tono neutro, `stacked`
 
 Ruta `notification` (calificaciones nuevas, adeudos, progreso, reinscripción).
-Secuencia: detalle (~0.8 s) → seguimiento (~0.7 s) → colapso (ventana total
-1.5 s antes de empezar a cerrarse). Canal configurable
-(cápsula / toast) — mismo evento una sola vez.
+Un solo aviso coherente con tres campos complementarios: `title` (qué pasó),
+`detail` (el dato concreto que solo se muestra al expandir) y `conclusion` (la
+consecuencia/resumen que calza colapsada). **Transitorio**: el aviso se limpia
+solo tras `CAPSULE_FLASH_LIFETIME_MS` (10 s) y la cápsula vuelve al horario.
+No se abre al llegar: nace **plegado** con un **pop bouncy** (escala y tamaño
+`back.out(2)` 0.6 s, `popKey` en `Capsule`) + **parpadeo** (doble blink de
+opacidad); el plegado crece hacia su nuevo tamaño (título + conclusión) para
+que se entienda que algo cambió, sin abrir la tarjeta. Si el usuario la abre,
+se revela el detalle. Canal configurable (cápsula / toast) — mismo evento una
+sola vez.
 
-**Plegado** — el detalle deja de estar a la derecha: **filas apiladas que
-aparecen línea por línea** (cada una con `studia-capsule-in`):
+CAMBIOS HECHOS: el flash ya no se abre solo (se quitó el pulso); pop bouncy +
+parpadeo al llegar; vida útil de 10 s (`CAPSULE_FLASH_LIFETIME_MS`), luego se
+limpia. El detalle solo aparece si el usuario abre la cápsula.
+
+**Plegado** — filas apiladas (título + conclusión; el detalle no aparece):
 - Línea 1 — título `text-capsule-body font-semibold text-on-surface`
   (ej. "Nueva calificación").
-- Luego la fase detalle agrega `notification.detail`
-  (`text-capsule-body font-medium text-on-surface-variant`, ej. "Matemáticas
-  10"); en fase seguimiento aparece `followUpDetail`
+- Línea 2 — `notification.conclusion`
   (`text-capsule-body font-medium tabular-nums text-primary-strong`, ej.
   "Promedio · 8.75").
+  
 
 **Desplegado (`stacked`)** — ancla con el título (`text-capsule-headline`) y
-las filas; bloque de énfasis bajo la materia:
-- Fase detalle: eyebrow `notification.title` + `notification.detail`
-  `font-display text-capsule-display font-bold leading-tight`.
-- Fase seguimiento: eyebrow `followUpTitle` + `followUpDetail` `font-display
-  text-capsule-display-lg font-bold tabular-nums text-primary-strong`.
-- CAMBIOS HECHOS (ajustable): migrado a `stacked`; filas progresivas; el
-  desplegado muestra título → detalle → consecuencia.
+la conclusión; bloque de énfasis bajo la materia con el detalle:
+- Eyebrow `notification.title` + `notification.detail` `font-display
+  text-capsule-display font-bold leading-tight` + `notification.conclusion`
+  (`text-capsule-body tabular-nums text-primary-strong`).
+- CAMBIOS HECHOS (ajustable): migrado a `stacked`; título + conclusión
+  plegados, detalle al expandir; se eliminó la secuencia en dos fases
+  (detalle → seguimiento).
 
 ## Pendientes (para seguir dictando) + calibración abierta
 
@@ -209,7 +257,12 @@ las filas; bloque de énfasis bajo la materia:
 2. **Resumido de materia**: calibrar el umbral de 12 caracteres contra
    nombres reales (hoy es una estimación de anchura General Sans 500
    text-capsule-caption).
-3. **Calibración en dispositivo (ajustable, ya implementado)**: timings del
+3. **Size attend → retirar**: cuando `interpolate-size: allow-keywords` tenga
+   soporte amplio (hoy Chrome/Edge y Safari modernos; Firefox y navegadores
+   viejos cubren el tracker JS en `Capsule.tsx`), borrar el tracker
+   (ResizeObserver + tween) y cubrir los content-swaps con una transición CSS
+   de `height`/`width` a `auto`.
+4. **Calibración en dispositivo (ajustable, ya implementado)**: timings del
    morf (0.6 s) y tamaños del expandido — ya en tokens (`text-capsule-*`,
    `spacing-capsule-*`), línea "· dura X" (solo upcoming), `gap`, paddings,
    revelado con `studia-capsule-in`. Dirección del anillo (medio-izquierda →

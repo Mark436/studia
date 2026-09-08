@@ -141,6 +141,7 @@ describe("getNextClassInfo", () => {
     expect(result).toEqual({
       weekday: 2,
       subjectName: "Redes",
+      classroom: "LB-24",
       startsLabel: "09:30",
     });
   });
@@ -157,6 +158,7 @@ describe("getNextClassInfo", () => {
     expect(result).toEqual({
       weekday: 3,
       subjectName: "Redes",
+      classroom: "LB-24",
       startsLabel: "10:00",
     });
   });
@@ -176,6 +178,7 @@ describe("getNextClassInfo", () => {
     expect(result).toEqual({
       weekday: 1,
       subjectName: "Cálculo",
+      classroom: "LB-24",
       startsLabel: "10:00",
     });
   });

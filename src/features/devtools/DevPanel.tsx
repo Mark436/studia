@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import type { ToastVariant } from "@/components/ui/toastVariants";
 import type { Alumno } from "@/lib/api/client";
+import type { NotificationDraft } from "@/lib/notifications/capsuleEvents";
 import type { DevConfig } from "./types";
 import { AdeudosSection } from "./components/AdeudosSection";
 import { ClockSection } from "./components/ClockSection";
@@ -27,7 +28,10 @@ interface DevPanelProps {
   alumno: Alumno | null;
   dev: DevToolsController;
   onShowToast?: (message: string, variant: ToastVariant) => void;
-  onSendTestNotification?: () => void;
+  onSendTestNotification?: (
+    draft: NotificationDraft,
+    withSystemPush: boolean,
+  ) => void;
 }
 
 export function DevPanel({

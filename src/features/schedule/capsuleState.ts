@@ -95,6 +95,7 @@ export interface NextClassInfo {
   /** Weekday (0–6) of the next class-bearing day after today. */
   weekday: number;
   subjectName: string;
+  classroom: string;
   startsLabel: string;
 }
 
@@ -117,6 +118,7 @@ export function getNextClassInfo(
       return {
         weekday,
         subjectName: first.subjectName,
+        classroom: first.classroom,
         startsLabel: formatMinutes(first.startMinutes),
       };
     }
