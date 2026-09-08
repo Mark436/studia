@@ -10,6 +10,7 @@ import type {
   Aviso,
   Boleta,
   CalificacionMateria,
+  Coordenadas,
   Credenciales,
   DatosAlumno,
   ReticulaMateria,
@@ -22,6 +23,7 @@ export type {
   Aviso,
   Boleta,
   CalificacionMateria,
+  Coordenadas,
   Credenciales,
   ReticulaMateria,
 };

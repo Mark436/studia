@@ -104,19 +104,78 @@ export function extraerFechasInicioLabores(texto: string): Date[] {
   return fechas;
 }
 
+/**
+ * Índice del mes que encabeza la columna donde cae `posicion`: el nombre de
+ * mes más cercano hacia atrás (el encabezado de sección se repite en el texto
+ * aplanado como «ENERO   ENERO», «AGOSTO   MAYO», etc.).
+ */
+function mesAntesDe(texto: string, posicion: number): number | null {
+  const re = new RegExp(MESES_RE.source, "gi");
+  let actual: number | null = null;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(texto)) !== null) {
+    if (match.index >= posicion) break;
+    const nombre = match[0].toLowerCase();
+    actual = MESES.find(([completo]) => completo.startsWith(nombre))?.[1] ?? actual;
+  }
+
+  return actual;
+}
+
+// La actividad 5 es «Publicación de orden de reinscripción, referencia
+// bancaria y Prehorarios»; su celda solo trae el día («9») y el mes viene de
+// la columna. El texto del PDF corrompe los acentos («reinscripci├│n») y a
+// veces escribe el 6 antes del 5, así que se busca por «orden de reinscripci».
+const RE_PUBLICACION_PREHORARIOS =
+  /orden\s+de\s+reinscripci[\s\S]{0,100}?\s(\d{1,2})(?=\s|$)/gi;
+
+/**
+ * Lógica pura: extrae la fecha de publicación de la orden de reinscripción /
+ * Prehorarios (actividad 5). El día está en la celda de la fila; el mes se
+ * infiere del encabezado de columna más cercano hacia atrás. Año: el del
+ * periodo (esta actividad está siempre en el primer mes del ciclo, no se le
+ * aplica la regla +1 de «inicio de labores»).
+ */
+export function extraerFechasPublicacionPrehorarios(texto: string): Date[] {
+  const normalizado = texto.replace(/\s+/g, " ");
+  const periodoAnio = anioDelPeriodo(normalizado);
+  const fechas: Date[] = [];
+
+  let match: RegExpExecArray | null;
+  while ((match = RE_PUBLICACION_PREHORARIOS.exec(normalizado)) !== null) {
+    const dia = Number(match[1]);
+    if (dia < 1 || dia > 31) continue;
+
+    const mes = mesAntesDe(normalizado, match.index);
+    if (mes === null) continue;
+
+    const anio = periodoAnio ?? new Date().getFullYear();
+    const fecha = new Date(anio, mes, dia);
+    if (!Number.isNaN(fecha.getTime())) fechas.push(fecha);
+  }
+
+  return fechas;
+}
+
 export interface ResultadoLecturaCalendario {
   fechas: Date[];
+  publicacionPrehorarios: Date[];
   texto: string;
 }
 
 /**
  * Descarga el PDF del calendario, extrae su texto con pdf.js y devuelve las
- * fechas de «inicio de labores» junto con el texto crudo.
+ * fechas de «inicio de labores» y la de publicación de prehorarios (actividad
+ * 5) junto con el texto crudo.
  */
 export async function leerFechasInicioLabores(
   url: string,
 ): Promise<ResultadoLecturaCalendario> {
   const texto = await leerTextoPDF(url);
 
-  return { fechas: extraerFechasInicioLabores(texto), texto };
+  return {
+    fechas: extraerFechasInicioLabores(texto),
+    publicacionPrehorarios: extraerFechasPublicacionPrehorarios(texto),
+    texto,
+  };
 }

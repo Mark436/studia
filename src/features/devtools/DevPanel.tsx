@@ -9,8 +9,6 @@ import { ClockSection } from "./components/ClockSection";
 import { GradesSection } from "./components/GradesSection";
 import { InteractionSection } from "./components/InteractionSection";
 import { MateriasSection } from "./components/MateriasSection";
-import { PrehorarioTestSection } from "./components/PrehorarioTestSection";
-import { ChequeoHorariosSection } from "./components/ChequeoHorariosSection";
 import { ToastsSection } from "./components/ToastsSection";
 import type { DevToolsController } from "./useDevConfig";
 
@@ -63,10 +61,6 @@ export function DevPanel({
       />
       <div className="border-t border-outline-variant pt-4" />
       <ToastsSection dev={dev} onShowToast={onShowToast} />
-      <div className="border-t border-outline-variant pt-4" />
-      <PrehorarioTestSection alumno={alumno} />
-      <div className="border-t border-outline-variant pt-4" />
-      <ChequeoHorariosSection alumno={alumno} />
 
       <div className="flex flex-col gap-2 border-t border-outline-variant pt-4">
         {simulating ? (

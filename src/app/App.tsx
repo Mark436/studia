@@ -28,11 +28,17 @@ import { StudentPage } from "@/features/student/StudentPage";
 import { SettingsSheet } from "@/features/settings/components/SettingsSheet";
 import { useCurrentTime } from "@/lib/devtools/useCurrentTime";
 import { formatAverage } from "@/lib/formatAverage";
+import { useHorariosCheck } from "@/lib/useHorariosCheck";
+import {
+  parseEstadoChequeo,
+  tocaAvisarTurnosReinscripcion,
+} from "@/lib/busquedaHorarios";
 import type { CapsuleNotification } from "@/lib/notifications/capsuleEvents";
 import { sendPushNotificationTest } from "@/lib/notifications/testPush";
 import {
   getSetting,
   setSetting,
+  SETTING_HORARIOS_CHECKS_STATE,
   SETTING_LAST_LOGIN_AT,
   SETTING_LAST_REAUTH_PROMPT_DATE,
 } from "@/lib/storage/settingsStore";
@@ -41,6 +47,7 @@ import {
   GRADE_CHANGES_TOAST,
   NEW_ADEUDO_TOAST,
   REFRESH_NUDGE_TOAST,
+  TURNOS_REINSCRIPCION_NUDGE_TOAST,
 } from "@/lib/toastMessages";
 import { formatProgressDelta } from "@/lib/notifications/progress";
 import { getHomeTab, NAV_ITEMS } from "./navigation";
@@ -144,6 +151,17 @@ function AuthenticatedShell() {
     setToast({ id: toastIdRef.current, message, variant });
   }, []);
 
+  // Daily background check for calendar/prehorario availability: runs at
+  // startup and on every foreground return (see useHorariosCheck). Resultados
+  // relevantes se anuncian como toast para avisar al alumno sin depender de
+  // que abra el modo dev.
+  useHorariosCheck(alumno, result => {
+    if (!result.mensaje) return;
+    const variant: ToastVariant =
+      result.fase === "buscar-prehorario" ? "success" : "neutral";
+    showToast(result.mensaje, variant);
+  });
+
   // Stale-data nudge: once the session is ~23h old, remind with a plain
   // toast suggesting a pull-to-refresh. The re-auth sheet is never pushed
   // automatically; it stays reachable through pull-to-refresh without
@@ -179,6 +197,20 @@ function AuthenticatedShell() {
         : true;
       if (!stale) return;
 
+      // Si ya pasó la fecha de publicación de turnos de reinscripción, el
+      // nudge lo menciona en lugar del mensaje genérico de datos viejos.
+      let mensaje = REFRESH_NUDGE_TOAST;
+      try {
+        const estado = parseEstadoChequeo(
+          await getSetting(SETTING_HORARIOS_CHECKS_STATE),
+        );
+        if (tocaAvisarTurnosReinscripcion(estado, today)) {
+          mensaje = TURNOS_REINSCRIPCION_NUDGE_TOAST;
+        }
+      } catch {
+        // Cualquier fallo de lectura mantiene el nudge genérico.
+      }
+
       try {
         await setSetting(SETTING_LAST_REAUTH_PROMPT_DATE, toDateKey(today));
       } catch {
@@ -186,7 +218,7 @@ function AuthenticatedShell() {
       }
 
       if (cancelled) return;
-      showToast(REFRESH_NUDGE_TOAST, "neutral");
+      showToast(mensaje, "neutral");
     })();
 
     return () => {
