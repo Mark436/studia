@@ -32,6 +32,14 @@ export const CAPSULE_COLLAPSE_EASE = "power3.out";
 export const CAPSULE_FLASH_DURATION = 0.6;
 export const CAPSULE_FLASH_EASE = "back.out(2)";
 
+// Content swap while the capsule stays in the same state (the "size attend"
+// tracker in Capsule.tsx): a short, quiet tween so the box follows a new
+// natural size instead of hopping. Discreet on purpose — content changes are
+// layout upkeep, not events. Once `interpolate-size` is broadly supported
+// this JS tracker goes away and a plain CSS height transition covers it.
+export const CAPSULE_ATTEND_DURATION = 0.3;
+export const CAPSULE_ATTEND_EASE = "power2.out";
+
 /** Capsule border-radius morph, tuned not to lag the Flip silhouette. */
 export const CAPSULE_RADIUS_DURATION = 0.5;
 export const CAPSULE_RADIUS_EASE = "power3.out";

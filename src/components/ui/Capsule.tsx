@@ -3,6 +3,8 @@ import type { FocusEvent, KeyboardEvent } from "react";
 import type { ReactNode } from "react";
 import gsap from "gsap";
 import {
+  CAPSULE_ATTEND_DURATION,
+  CAPSULE_ATTEND_EASE,
   CAPSULE_COLLAPSE_DURATION,
   CAPSULE_COLLAPSE_EASE,
   CAPSULE_FLASH_DURATION,
@@ -99,35 +101,37 @@ function clearPadding(element: HTMLElement): void {
   element.style.paddingLeft = "";
 }
 
+/** Tween target for the "size attend" tween (structural TweenVars stand-in). */
+interface AttendTarget {
+  width: number;
+  height: number;
+  duration: number;
+  ease: string;
+  overwrite: "auto";
+  onComplete: () => void;
+  x?: number;
+}
+
 /**
- * Two half-perimeter arc paths for the progress ring. Both start at the
- * middle of the left edge and grow outward: the top arc travels up → right →
- * down, the bottom arc travels down → right → up, so the ring fills the
- * border up and down at the same time and the gap closes at the
- * right-middle. `radius` matches the capsule corner radius so the stroke hugs
- * the (pill or rounded) border. Each path reports `pathLength` 100 so one
- * shared dasharray renders as a percentage.
+ * Progress ring geometry for the capsule box (single rounded rect, drawn as a
+ * closed path so `pathLength` + `strokeDasharray` fill it clockwise from the
+ * top-left). A rounded rect — not two hand-built arcs — stays glued to the
+ * border because GSAP can tween its x/y/width/height/rx attributes in one
+ * pass while the capsule morphs, so the ring resizes with the box instead of
+ * lagging behind it.
  */
-function ringArcPaths(
+function ringAttrs(
   width: number,
   height: number,
   radius: number,
-): [string, string] {
-  const r = Math.max(0, Math.min(radius, height / 2));
-  const half = height / 2;
-  const top = [
-    `M 0 ${half}`,
-    `L 0 ${r} A ${r} ${r} 0 0 1 ${r} 0`,
-    `L ${width - r} 0 A ${r} ${r} 0 0 1 ${width} ${r}`,
-    `L ${width} ${half}`,
-  ].join(" ");
-  const bottom = [
-    `M 0 ${half}`,
-    `L 0 ${height - r} A ${r} ${r} 0 0 0 ${r} ${height}`,
-    `L ${width - r} ${height} A ${r} ${r} 0 0 0 ${width} ${height - r}`,
-    `L ${width} ${half}`,
-  ].join(" ");
-  return [top, bottom];
+): Record<"x" | "y" | "width" | "height" | "rx", number> {
+  return {
+    x: RING_INSET_PX,
+    y: RING_INSET_PX,
+    width: Math.max(0, width - RING_STROKE_PX),
+    height: Math.max(0, height - RING_STROKE_PX),
+    rx: Math.max(0, radius),
+  };
 }
 
 // The context capsule: a floating island sitting at the top-left that morphs
@@ -163,6 +167,7 @@ export function Capsule({
     height: number;
   } | null>(null);
   const elementRef = useRef<HTMLButtonElement>(null);
+  const ringRectRef = useRef<SVGRectElement>(null);
   const collapseTimerRef = useRef<number | undefined>(undefined);
   const previousPulseRef = useRef(pulseKey);
   const previousPopKeyRef = useRef(popKey);
@@ -389,6 +394,121 @@ export function Capsule({
         morphingRef.current = false;
       },
     });
+
+    // Keep the progress ring glued to the border: tween its rounded-rect
+    // geometry on the same clock as the box so it never lags the silhouette.
+    // (Only the child rect's rx tween is animated — the button's own radius
+    // still snaps via classes, so the backdrop blur is never re-sampled.)
+    if (ringRectRef.current !== null) {
+      gsap.to(ringRectRef.current, {
+        attr: ringAttrs(
+          targetWidth,
+          targetHeight,
+          isExpanded ? EXPANDED_RADIUS_PX : targetHeight / 2,
+        ),
+        duration: isExpanded
+          ? CAPSULE_MORPH_DURATION
+          : CAPSULE_COLLAPSE_DURATION,
+        ease: isExpanded ? CAPSULE_MORPH_EASE : CAPSULE_COLLAPSE_EASE,
+        overwrite: "auto",
+      });
+    }
+  }, [isExpanded, reducedMotion]);
+
+  // Size attend: when the CONTENT swaps while the capsule stays in the same
+  // state (schedule pill "Xh" → "mañana HH:MM", the flash replacing the pill,
+  // the expanded anchor growing, a container reflow), the natural size changes
+  // with no state toggle — which otherwise hops. Watch the box; when its size
+  // moves while nothing else owns it (no morph, no flash pop in flight),
+  // travel to the new natural size with a short quiet tween.
+  //
+  // `interpolate-size: allow-keywords` in index.css already makes `auto`
+  // interpolable for the browsers that support it; once support is broad this
+  // JS tracker gets deleted and a plain CSS height transition covers the same
+  // swaps.
+  useEffect(() => {
+    const element = elementRef.current;
+    if (element === null) return;
+
+    const attend = () => {
+      if (morphingRef.current) return; // state morph or pop owns the size
+
+      const record = isExpanded ? expandedSizeRef : collapsedSizeRef;
+      const previous = record.current;
+      if (previous === null) return;
+
+      const targetWidth = element.offsetWidth;
+      const targetHeight = element.offsetHeight;
+      if (targetWidth <= 0 || targetHeight <= 0) return;
+
+      if (reducedMotion) {
+        // Honor reduced motion: snap is fine, but keep the recorded sizes
+        // fresh so a later (enabled) morph starts from the right value.
+        record.current = { width: targetWidth, height: targetHeight };
+        return;
+      }
+
+      const moved =
+        Math.abs(previous.width - targetWidth) > 1 ||
+        Math.abs(previous.height - targetHeight) > 1;
+      if (!moved) {
+        record.current = { width: targetWidth, height: targetHeight };
+        return;
+      }
+
+      record.current = { width: targetWidth, height: targetHeight };
+      morphingRef.current = true;
+      element.style.transition = "none";
+      gsap.killTweensOf(element);
+      gsap.set(element, {
+        width: previous.width,
+        height: previous.height,
+        minWidth: 0,
+        scale: 1,
+        opacity: 1,
+      });
+
+      const target: AttendTarget = {
+        width: targetWidth,
+        height: targetHeight,
+        duration: CAPSULE_ATTEND_DURATION,
+        ease: CAPSULE_ATTEND_EASE,
+        overwrite: "auto",
+        onComplete() {
+          element.style.width = "";
+          element.style.height = "";
+          element.style.minWidth = "";
+          element.style.transition = "";
+          morphingRef.current = false;
+        },
+      };
+      // An expanded swap changes the centering too.
+      if (isExpanded && element.parentElement !== null) {
+        target.x = Math.max(
+          0,
+          (element.parentElement.clientWidth - targetWidth) / 2,
+        );
+      }
+
+      if (ringRectRef.current !== null) {
+        gsap.to(ringRectRef.current, {
+          attr: ringAttrs(
+            targetWidth,
+            targetHeight,
+            isExpanded ? EXPANDED_RADIUS_PX : targetHeight / 2,
+          ),
+          duration: CAPSULE_ATTEND_DURATION,
+          ease: CAPSULE_ATTEND_EASE,
+          overwrite: "auto",
+        });
+      }
+
+      gsap.to(element, target);
+    };
+
+    const observer = new ResizeObserver(attend);
+    observer.observe(element);
+    return () => observer.disconnect();
   }, [isExpanded, reducedMotion]);
 
   // Transient pop while collapsed: a swapped-in flash is announced with a
@@ -499,9 +619,11 @@ export function Capsule({
     [],
   );
 
-  // Border-radius is static per state (classes `rounded-full` / `rounded-[20px]`)
-  // and never tweened: animating radius on a backdrop-filter element re-samples
-  // the blur frame by frame. skipped on purpose — see comment on Capsule.
+  // The button's border-radius is static per state (classes `rounded-full` /
+  // `rounded-[20px]`) and never tweened: animating the radius on a
+  // backdrop-filter element re-samples the blur frame by frame. Only the child
+  // progress rect's `rx` is tweened (SVG, no blur), so the ring hugs the border
+  // through the morph while the glass stays rasterized.
 
   // Track the capsule box so the ring hugs its border at every size. Updates
   // are skipped while the morph tween runs (the box size is in flight); the
@@ -528,8 +650,6 @@ export function Capsule({
     reducedMotion && isExpanded ? "left-1/2 -translate-x-1/2" : "left-0";
 
   const progress = Math.min(Math.max(progressPercent ?? 0, 0), 100);
-  const ringWidth = (ringSize?.width ?? 0) - RING_STROKE_PX;
-  const ringHeight = (ringSize?.height ?? 0) - RING_STROKE_PX;
   const ringRadius = isExpanded
     ? EXPANDED_RADIUS_PX
     : (ringSize?.height ?? 0) / 2;
@@ -556,23 +676,17 @@ export function Capsule({
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 h-full w-full"
         >
-          {ringWidth > 0 && ringHeight > 0 ? (
-            <g
-              transform={`translate(${RING_INSET_PX} ${RING_INSET_PX})`}
+          {ringSize !== null && ringSize.width > 0 && ringSize.height > 0 ? (
+            <rect
+              ref={ringRectRef}
+              {...ringAttrs(ringSize.width, ringSize.height, ringRadius)}
               fill="none"
               stroke="var(--studia-cobalto)"
               strokeWidth={RING_STROKE_PX}
               vectorEffect="non-scaling-stroke"
-            >
-              {ringArcPaths(ringWidth, ringHeight, ringRadius).map((d) => (
-                <path
-                  key={d}
-                  d={d}
-                  pathLength={100}
-                  strokeDasharray={`${progress} ${100 - progress}`}
-                />
-              ))}
-            </g>
+              pathLength={100}
+              strokeDasharray={`${progress} ${100 - progress}`}
+            />
           ) : null}
         </svg>
       ) : null}

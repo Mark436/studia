@@ -50,17 +50,23 @@ Expandido (`stacked`):
 
 ### Fase 4 — Barra de progreso como borde SVG
 
-- Se reemplazó la máscara CSS del borde-progreso por dos `<path>` de medio
-  perímetro con `vector-effect: non-scaling-stroke` y `pathLength`, dentro de
-  un `<g>` posicionado `inset-0` relativo a la cápsula (siempre pegado al
-  borde).
-- Dirección de revelado (decidido por el usuario): ambos arcos arrancan en el
-  **medio del borde izquierdo** y se llenan a la vez hacia arriba y abajo;
-  el hueco se cierra en el medio del borde derecho.
-- El radio del arco coincide con el de la cápsula (`EXPANDED_RADIUS_PX` 20 en
-  expandido; `height/2` en píldora) y es **estático por estado** — no se
-  tweena (Fase 1), así el trazo tiene la forma píldora/card correcta en
-  cualquier pantalla.
+- Se reemplazó la máscara CSS del borde-progreso por un **`<rect>` SVG
+  redondeado** con `vector-effect: non-scaling-stroke`, `pathLength` y
+  `strokeDasharray`, dentro de un `<svg>` `inset-0` relativo a la cápsula
+  (siempre pegado al borde).
+- La geometría del rect (x/y/width/height/rx) se tweena con GSAP **en el
+  mismo reloj que el morf de la caja** (y que el size-attend), así el anillo
+  acompaña la silueta frame a frame en vez de quedarse en el tamaño viejo y
+  "pegar" al final (ver Fase 6).
+- Dirección de revelado: el rect se llena en la orientación de su `<path>`
+  (desde la esquina superior izquierda hacia la derecha, en el sentido de las
+  agujas del reloj); el hueco-terminal se cierra cerca de la esquina superior
+  izquierda. VOLVIÓ al rect anterior a petición del usuario — la variante de
+  dos arcos con fuga en el medio derecho queda descartada por ahora (cambia
+  el arranque visual del anillo en morphs de tamaño).
+- El radio coincide con el de la cápsula (`EXPANDED_RADIUS_PX` 20 en
+  expandido; `height/2` en píldora). Solo el `rx` del rect se tweena — es SVG
+  sin `backdrop-filter`, así el blur del glass nunca se re-muestrea.
 
 ### Fase 5 — Tokens de escala y cápsula neutra sin borde
 
@@ -93,6 +99,18 @@ Expandido (`stacked`):
 - El flash, al limpiarse (vida útil de 10 s), **vuelve** al tamaño del pill del
   horario con un settle suave (`CAPSULE_COLLAPSE_DURATION/EASE`, sin blink) en
   vez de cambiar de contenido con un salto.
+- **Size attend**: cuando el CONTENIDO cambia sin cambiar de estado (el pill
+  "Xh" → "mañana HH:MM", el flash relevando al pill, el bloque expandido
+  creciendo, un reflow del contenedor), el tamaño natural cambia y no hay
+  toggle que lo anime — saltaba. Un `ResizeObserver` sobre la cápsula re-mide
+  y viaja al nuevo tamaño natural con un tween corto y discreto
+  (`CAPSULE_ATTEND_DURATION 0.3 s`, `power2.out`). Se salta mientras el morf
+  o el pop es dueño de la caja. El anillo SVG se tweenea igual para que no
+  lag.
+- `interpolate-size: allow-keywords` en `index.css` hace `auto` interpolable
+  en los navegadores que lo soportan: es el camino CSS moderno. Cuando el
+  soporte sea amplio se **retira el tracker JS** y una transición CSS de
+  altura cubre los mismos swaps (anotado en Pendientes).
 
 ## 5. Estados de la cápsula — inventario (plegado / desplegado)
 
@@ -239,7 +257,12 @@ la conclusión; bloque de énfasis bajo la materia con el detalle:
 2. **Resumido de materia**: calibrar el umbral de 12 caracteres contra
    nombres reales (hoy es una estimación de anchura General Sans 500
    text-capsule-caption).
-3. **Calibración en dispositivo (ajustable, ya implementado)**: timings del
+3. **Size attend → retirar**: cuando `interpolate-size: allow-keywords` tenga
+   soporte amplio (hoy Chrome/Edge y Safari modernos; Firefox y navegadores
+   viejos cubren el tracker JS en `Capsule.tsx`), borrar el tracker
+   (ResizeObserver + tween) y cubrir los content-swaps con una transición CSS
+   de `height`/`width` a `auto`.
+4. **Calibración en dispositivo (ajustable, ya implementado)**: timings del
    morf (0.6 s) y tamaños del expandido — ya en tokens (`text-capsule-*`,
    `spacing-capsule-*`), línea "· dura X" (solo upcoming), `gap`, paddings,
    revelado con `studia-capsule-in`. Dirección del anillo (medio-izquierda →
