@@ -16,17 +16,13 @@ import {
 export type CapsuleTone = "neutral" | "accent";
 
 interface CapsuleProps {
-  /** Anchor shown while collapsed (and leading the content when expanded).
-      This is the content that does NOT change between states. */
+  /** Anchor shown while collapsed AND when expanded (same content, scaled).
+      This is the single source of truth for the capsule's visible content. */
   minimized: ReactNode;
-  /** Detail content revealed on expand. With `stacked` it renders below the
-      anchor; otherwise beside it. */
-  expanded?: ReactNode;
-  /** Larger variant of `minimized` shown when `stacked` expands. Real layout
-      instead of a transform scale, so the capsule grows to fit its content
-      and the progress ring stays glued to the border. Falls back to
-      `minimized` when omitted. */
+  /** Optional detail content revealed on expand (stacked below the anchor). */
   minimizedExpanded?: ReactNode;
+  /** Optional detail content revealed on expand (stacked below the anchor). */
+  expanded?: ReactNode;
   /** Change this key to trigger one expand pulse (important events only). */
   pulseKey?: string | number;
   /** Change this key while collapsed to play a bouncy "pop" (blink + size
@@ -35,13 +31,11 @@ interface CapsuleProps {
   popKey?: string | number;
   /** Delay before an expanded capsule collapses back (ms), manual or pulsed. */
   autoCollapseMs?: number;
-  /** 0–100: when provided, draws a progress ring on the capsule border via a
-      CSS mask (the full border revealed across the capsule, left to right)
-      used for the in-class countdown. */
+  /** 0–100: when provided, draws two horizontal progress lines (top/bottom)
+      filling left→right on the capsule border, used for in-class countdown. */
   progressPercent?: number;
-  /** "stacked": the anchor replaces the previous right-side detail — it is
-      the only content, enlarged through `minimizedExpanded`, with `expanded`
-      stacked below it. */
+  /** "stacked": the anchor is the only content, enlarged via transform scale;
+      `expanded` stacks below it. */
   stacked?: boolean;
   tone?: CapsuleTone;
   ariaLabel?: string;
@@ -65,7 +59,37 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-/** Per-side padding of the capsule box (px). */
+const PROGRESS_STROKE_PX = 2;
+const PROGRESS_INSET_PX = 1;
+const EXPANDED_RADIUS_PX = 12;
+
+function collapsedRadiusPx({ element, isExpanded }: { element: HTMLElement; isExpanded: boolean }): number {
+  if (isExpanded) return EXPANDED_RADIUS_PX;
+  const height = element.offsetHeight || 0;
+  return height / 2;
+}
+
+/**
+ * Progress line geometry: two horizontal lines (top and bottom) that fill
+ * from left to right.
+ */
+function progressLineAttrs(
+  width: number,
+  height: number,
+): {
+  top: { x1: number; y1: number; x2: number; y2: number };
+  bottom: { x1: number; y1: number; x2: number; y2: number };
+} {
+  const inset = PROGRESS_INSET_PX;
+  const innerWidth = Math.max(0, width - 2 * inset);
+  const yTop = inset;
+  const yBottom = Math.max(inset, height - inset);
+  return {
+    top: { x1: inset, y1: yTop, x2: inset + innerWidth, y2: yTop },
+    bottom: { x1: inset, y1: yBottom, x2: inset + innerWidth, y2: yBottom },
+  };
+}
+
 interface CapsulePadding {
   top: number;
   right: number;
@@ -97,7 +121,6 @@ function clearPadding(element: HTMLElement): void {
   element.style.paddingLeft = "";
 }
 
-/** Tween target for the "size attend" tween (structural TweenVars stand-in). */
 interface AttendTarget {
   width: number;
   height: number;
@@ -108,47 +131,18 @@ interface AttendTarget {
   x?: number;
 }
 
-const PROGRESS_STROKE_PX = 2;
-const PROGRESS_INSET_PX = 1;
-
 /**
- * Progress line geometry: two horizontal lines (top and bottom) that fill
- * from left to right. Returns coordinates for both lines.
+ * Capsule component:
+ * - Single anchor content (`minimized`) used in both collapsed and expanded states
+ * - Expanded state scales the anchor via transform (not font-size) and optionally
+ *   reveals `expanded` content below it (stacked layout)
+ * - Border-radius animated via CSS variable on the button (no backdrop-filter
+ *   re-sampling because the glass panel is a pseudo-element or separate layer)
+ * - Progress lines (top/bottom) fill left→right, animated on same timeline
+ * - Flash (`popKey`) shows accent background at 40% opacity with blink
  */
-function progressLineAttrs(
-  width: number,
-  height: number,
-): {
-  top: { x1: number; y1: number; x2: number; y2: number };
-  bottom: { x1: number; y1: number; x2: number; y2: number };
-} {
-  const inset = PROGRESS_INSET_PX;
-  const innerWidth = Math.max(0, width - 2 * inset);
-  const yTop = inset;
-  const yBottom = Math.max(inset, height - inset);
-  return {
-    top: { x1: inset, y1: yTop, x2: inset + innerWidth, y2: yTop },
-    bottom: { x1: inset, y1: yBottom, x2: inset + innerWidth, y2: yBottom },
-  };
-}
-
-// The context capsule: a floating island sitting at the top-left that morphs
-// to a centered expanded card. Position travels through a composited `x`
-// transform (never `left`), so the backdrop blur behind the glass panel stays
-// rasterized and constant across the whole tween. The border-radius is NOT
-// animated (it snaps per state via classes): any radius tween forces the
-// browser to re-sample the backdrop-filter frame by frame, which reads as the
-// blur "animating". Padding IS animated (interpolable), so the box grows
-// smoothly even though width/height are content-fit. The anchor's position is
-// owned by GSAP, so every collapse plays its full (slightly slower) duration
-// regardless of what triggered it (tap, pulse, timer, Escape, blur or outside
-// press).
-//
-// Expansion is always transient: it ends after autoCollapseMs, on Escape, on
-// focus leaving the island, or on a pointer press outside of it.
 export function Capsule({
   minimized,
-  minimizedExpanded,
   expanded,
   pulseKey,
   popKey,
@@ -167,21 +161,15 @@ export function Capsule({
   const elementRef = useRef<HTMLButtonElement>(null);
   const topLineRef = useRef<SVGLineElement>(null);
   const bottomLineRef = useRef<SVGLineElement>(null);
+  const flashOverlayRef = useRef<HTMLDivElement>(null);
   const collapseTimerRef = useRef<number | undefined>(undefined);
   const previousPulseRef = useRef(pulseKey);
   const previousPopKeyRef = useRef(popKey);
   const popTimelineRef = useRef<ReturnType<typeof gsap.timeline> | null>(null);
-  // Natural sizes of both states so the morph can travel width/height px when
-  // the content swap happens (fit-content is not interpolable by GSAP).
-  const collapsedSizeRef = useRef<{ width: number; height: number } | null>(
-    null,
-  );
-  const expandedSizeRef = useRef<{ width: number; height: number } | null>(
-    null,
-  );
-  // Same bookkeeping for per-side padding, tweened in sync with the box so
-  // the interior doesn't lag the outer size (the CSS padding transition would
-  // animate on its own 300 ms clock and make the height "jump" at the end).
+  // Natural sizes of both states (width/height are fit-content, not interpolable).
+  const collapsedSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const expandedSizeRef = useRef<{ width: number; height: number } | null>(null);
+  // Per-side padding, tweened in sync with the box.
   const collapsedPadRef = useRef<CapsulePadding | null>(null);
   const expandedPadRef = useRef<CapsulePadding | null>(null);
   const prevExpandedRef = useRef(isExpanded);
@@ -227,7 +215,7 @@ export function Capsule({
 
   useEffect(() => clearCollapseTimer, []);
 
-  // A press anywhere outside the island dismisses it immediately.
+  // Dismiss on outside press.
   useEffect(() => {
     if (!isExpanded) return;
 
@@ -251,7 +239,6 @@ export function Capsule({
       collapseNow();
       return;
     }
-
     setIsExpanded(true);
     scheduleCollapse();
   }
@@ -269,16 +256,7 @@ export function Capsule({
     }
   }
 
-  // After React commits the new layout, travel to (or from) the centered
-  // position AND grow/shrink the box to match the new content. Width/height
-  // are fit-content (not interpolable), so each state's natural size is
-  // measured and the other state's size is applied as the from-value while
-  // GSAP tweens width/height/x together. Runs before paint so the swap into
-  // the expanded content never flashes at full size. On completion the box
-  // returns to content-fit (auto) and the ring's ResizeObserver re-hugs the
-  // border. Collapse is a touch slower than the expansion so leaving reads as
-  // deliberate. A re-toggle mid-tween kills the running tween and resumes
-  // from the current visual size instead of being ignored.
+  // Main morph: size + position + padding + border-radius + progress lines.
   useLayoutEffect(() => {
     const element = elementRef.current;
     if (element === null) return;
@@ -290,8 +268,6 @@ export function Capsule({
     prevExpandedRef.current = isExpanded;
 
     if (reducedMotion || !changed) {
-      // Still capture the rest-size of the committed state so the first real
-      // morph has a from-value (and the ring has settled dimensions).
       if (!morphingRef.current) {
         if (isExpanded) {
           expandedSizeRef.current = {
@@ -316,14 +292,11 @@ export function Capsule({
     const fromPadRef = isExpanded
       ? collapsedPadRef.current
       : expandedPadRef.current;
-    // If a morph is in flight the box is pinned to the animated size; snap up
-    // from there instead of from a rest state (rare mid-tween re-toggle).
     const inFlight = gsap.getTweensOf(element).length > 0;
     const fromWidth = inFlight ? element.offsetWidth : fromRef?.width;
     const fromHeight = inFlight ? element.offsetHeight : fromRef?.height;
     const fromPadding = inFlight ? readPadding(element) : fromPadRef;
-    // For collapse, the FROM position is the current centered x (not 0).
-    // Read the actual transform; fallback to 0 only when expanding from collapsed.
+    // For collapse, read actual centered x; for expand, from 0.
     const fromX = isExpanded
       ? 0
       : inFlight
@@ -331,20 +304,12 @@ export function Capsule({
         : gsap.getProperty(element, "x");
 
     gsap.killTweensOf(element);
-    // Unpin (no-op on a resting element) to read the true natural size of the
-    // committed content — the morph target.
     element.style.width = "";
     element.style.height = "";
     element.style.minWidth = "";
     gsap.set(element, { x: 0, scale: 1, opacity: 1 });
-    // The class carries `transition-[padding,opacity]`: while it is active a
-    // freshly-started transition reports its START value, so a measurement
-    // would read padding from the wrong state and the tween would land short
-    // (the classic "height jumps" at the end). Disable it for the measurement
-    // and the whole tween; padding is animated by GSAP below and the class
-    // transition is restored (inline "") once the morph completes.
     element.style.transition = "none";
-    void element.offsetWidth; // flush a layout read with the target classes
+    void element.offsetWidth;
     const targetWidth = element.offsetWidth;
     const targetHeight = element.offsetHeight;
     const targetPadding = readPadding(element);
@@ -364,16 +329,16 @@ export function Capsule({
     const targetX = isExpanded
       ? Math.max(0, (parent.clientWidth - targetWidth) / 2)
       : 0;
+    const targetRadius = collapsedRadiusPx({ element, isExpanded });
 
     morphingRef.current = true;
-    // Allow the from-side to dip under min-w-64 while the width tween runs;
-    // the class min-width is restored on complete.
     if (fromWidth !== undefined) {
       gsap.set(element, {
         width: fromWidth,
         height: fromHeight ?? fromWidth,
         minWidth: 0,
         x: Number(fromX),
+        borderRadius: collapsedRadiusPx({ element, isExpanded }),
       });
       if (fromPadding !== null) applyPadding(element, fromPadding);
     }
@@ -381,13 +346,12 @@ export function Capsule({
       width: targetWidth,
       height: targetHeight,
       x: targetX,
+      borderRadius: targetRadius,
       paddingTop: targetPadding.top,
       paddingRight: targetPadding.right,
       paddingBottom: targetPadding.bottom,
       paddingLeft: targetPadding.left,
-      duration: isExpanded
-        ? CAPSULE_MORPH_DURATION
-        : CAPSULE_COLLAPSE_DURATION,
+      duration: isExpanded ? CAPSULE_MORPH_DURATION : CAPSULE_COLLAPSE_DURATION,
       ease: isExpanded ? CAPSULE_MORPH_EASE : CAPSULE_COLLAPSE_EASE,
       overwrite: "auto",
       onComplete() {
@@ -396,17 +360,14 @@ export function Capsule({
         element.style.minWidth = "";
         clearPadding(element);
         element.style.transition = "";
+        element.style.borderRadius = "";
         morphingRef.current = false;
       },
     });
 
-    // Keep the progress lines glued to the border: tween their coordinates
-    // on the same clock as the box so they never lag the silhouette.
+    // Progress lines on same timeline.
     if (topLineRef.current !== null && bottomLineRef.current !== null) {
-      const { top, bottom } = progressLineAttrs(
-        targetWidth,
-        targetHeight,
-      );
+      const { top, bottom } = progressLineAttrs(targetWidth, targetHeight);
       gsap.to(topLineRef.current, {
         attr: top,
         duration: isExpanded
@@ -426,23 +387,13 @@ export function Capsule({
     }
   }, [isExpanded, reducedMotion]);
 
-  // Size attend: when the CONTENT swaps while the capsule stays in the same
-  // state (schedule pill "Xh" → "mañana HH:MM", the flash replacing the pill,
-  // the expanded anchor growing, a container reflow), the natural size changes
-  // with no state toggle — which otherwise hops. Watch the box; when its size
-  // moves while nothing else owns it (no morph, no flash pop in flight),
-  // travel to the new natural size with a short quiet tween.
-  //
-  // `interpolate-size: allow-keywords` in index.css already makes `auto`
-  // interpolable for the browsers that support it; once support is broad this
-  // JS tracker gets deleted and a plain CSS height transition covers the same
-  // swaps.
+  // Size attend: content swap while same state.
   useEffect(() => {
     const element = elementRef.current;
     if (element === null) return;
 
     const attend = () => {
-      if (morphingRef.current) return; // state morph or pop owns the size
+      if (morphingRef.current) return;
 
       const record = isExpanded ? expandedSizeRef : collapsedSizeRef;
       const previous = record.current;
@@ -453,8 +404,6 @@ export function Capsule({
       if (targetWidth <= 0 || targetHeight <= 0) return;
 
       if (reducedMotion) {
-        // Honor reduced motion: snap is fine, but keep the recorded sizes
-        // fresh so a later (enabled) morph starts from the right value.
         record.current = { width: targetWidth, height: targetHeight };
         return;
       }
@@ -490,10 +439,10 @@ export function Capsule({
           element.style.height = "";
           element.style.minWidth = "";
           element.style.transition = "";
+          element.style.borderRadius = "";
           morphingRef.current = false;
         },
       };
-      // An expanded swap changes the centering too.
       if (isExpanded && element.parentElement !== null) {
         target.x = Math.max(
           0,
@@ -525,32 +474,26 @@ export function Capsule({
     return () => observer.disconnect();
   }, [isExpanded, reducedMotion]);
 
-  // Transient pop while collapsed: a swapped-in flash is announced with a
-  // bouncy size/scale spring toward its new natural size plus a quick double
-  // blink, so an event reads as "something happened" without the card opening
-  // on its own. When the flash leaves (notification cleared), the same tween
-  // settles back to the schedule pill's natural size so the return doesn't
-  // hop. Skips when the capsule is mid-morph or already expanded.
+  // Flash pop (collapsed only): bouncy scale + accent blink at 40% opacity.
   useLayoutEffect(() => {
     if (popKey === previousPopKeyRef.current) return;
     const departed = popKey === undefined || popKey === "";
     previousPopKeyRef.current = popKey;
 
     const element = elementRef.current;
+    const flashOverlay = flashOverlayRef.current;
     if (element === null || reducedMotion || isExpanded) return;
 
     const fromSize = collapsedSizeRef.current;
 
     gsap.killTweensOf(element);
     popTimelineRef.current?.kill();
-    // The class carries `transition-[padding,opacity]`; the blink below moves
-    // opacity by the frame, so the CSS transition must not double-ease it.
     element.style.transition = "none";
-    // Unpin to read the true natural size of the committed content.
     element.style.width = "";
     element.style.height = "";
     element.style.minWidth = "";
     gsap.set(element, { x: 0, scale: 1, opacity: 1 });
+    if (flashOverlay) gsap.set(flashOverlay, { opacity: 0 });
     const targetWidth = element.offsetWidth;
     const targetHeight = element.offsetHeight;
     if (targetWidth <= 0 || targetHeight <= 0) {
@@ -575,14 +518,15 @@ export function Capsule({
         element.style.height = "";
         element.style.minWidth = "";
         gsap.set(element, { scale: 1, opacity: 1 });
+        if (flashOverlay) gsap.set(flashOverlay, { opacity: 0 });
         element.style.transition = "";
+        element.style.borderRadius = "";
         morphingRef.current = false;
         collapsedSizeRef.current = { width: targetWidth, height: targetHeight };
       },
     });
     popTimelineRef.current = timeline;
 
-    // Flash leaving: a quiet settle back to the schedule pill size — no blink.
     if (departed) {
       timeline.to(
         element,
@@ -597,7 +541,7 @@ export function Capsule({
         0,
       );
     } else {
-      // Arrival: bouncy pop plus a double blink right where the event lands.
+      // Arrival: bouncy scale + accent flash blink at 40% opacity.
       timeline
         .to(
           element,
@@ -617,12 +561,22 @@ export function Capsule({
           { opacity: 1, duration: 0.09, ease: "power1.out" },
           0,
         )
-        .to(
-          element,
-          { opacity: 0.65, duration: 0.05, ease: "power1.in" },
-          0.12,
-        )
+        .to(element, { opacity: 0.65, duration: 0.05, ease: "power1.in" }, 0.12)
         .to(element, { opacity: 1, duration: 0.06, ease: "power1.out" }, 0.17);
+
+      // Accent flash overlay blink (40% opacity).
+      if (flashOverlay) {
+        timeline
+          .fromTo(
+            flashOverlay,
+            { opacity: 0 },
+            { opacity: 0.4, duration: 0.08, ease: "power1.out" },
+            0,
+          )
+          .to(flashOverlay, { opacity: 0.15, duration: 0.06, ease: "power1.in" }, 0.1)
+          .to(flashOverlay, { opacity: 0.4, duration: 0.07, ease: "power1.out" }, 0.16)
+          .to(flashOverlay, { opacity: 0, duration: 0.08, ease: "power1.in" }, 0.23);
+      }
     }
   }, [popKey, isExpanded, reducedMotion]);
 
@@ -633,15 +587,7 @@ export function Capsule({
     [],
   );
 
-  // The button's border-radius is static per state (classes `rounded-full` /
-  // `rounded-[20px]`) and never tweened: animating the radius on a
-  // backdrop-filter element re-samples the blur frame by frame. Only the child
-  // progress rect's `rx` is tweened (SVG, no blur), so the ring hugs the border
-  // through the morph while the glass stays rasterized.
-
-  // Track the capsule box so the progress lines hug its border at every size. Updates
-  // are skipped while the morph tween runs (the box size is in flight); the
-  // final ResizeObserver read lands once sizing returns to auto.
+  // Track size for progress lines.
   useEffect(() => {
     const element = elementRef.current;
     if (element === null || progressPercent === undefined) {
@@ -666,6 +612,9 @@ export function Capsule({
   const progress = Math.min(Math.max(progressPercent ?? 0, 0), 100);
   const inset = PROGRESS_INSET_PX;
 
+  // Tone class for glass panel (base color). Flash overlay handles accent.
+  const glassClass = tone === "accent" ? "glass-panel-accent" : "glass-panel-bare";
+
   return (
     <button
       ref={elementRef}
@@ -675,20 +624,38 @@ export function Capsule({
       onKeyDown={handleKeyDown}
       aria-expanded={isExpanded}
       aria-label={ariaLabel}
-      className={`pointer-events-auto absolute z-30 select-none text-left ${positionClass} ${
+      className={`pointer-events-auto absolute z-30 select-none text-left overflow-hidden ${positionClass} ${
         isExpanded
           ? "max-w-[calc(100vw-1rem)] min-w-64 rounded-[20px] p-capsule-pad"
           : "min-h-12 rounded-full px-capsule-pad-sm"
-      } transition-[padding,opacity] duration-300 ease-out active:opacity-80 ${
-        tone === "accent" ? "glass-panel-accent" : "glass-panel-bare"
-      } ${className ?? ""}`}
+      } transition-[padding,opacity] duration-300 ease-out active:opacity-80 ${glassClass} ${className ?? ""}`}
+      style={{
+        // CSS variable for border-radius animated by GSAP.
+        // The actual radius is set inline by GSAP; this is the resting value.
+        borderRadius: isExpanded ? `${EXPANDED_RADIUS_PX}px` : "30px",
+      }}
     >
+      {/* Accent flash overlay (40% opacity) - sits behind content, above glass. */}
+      <div
+        ref={flashOverlayRef}
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: "var(--studia-cobalto)",
+          borderRadius: "inherit",
+          opacity: 0,
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Progress lines (top + bottom), fill left→right. */}
       {progressPercent !== undefined ? (
         <svg
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 h-full w-full"
         >
-          {progressSize !== null && progressSize.width > 0 && progressSize.height > 0 ? (
+          {progressSize !== null &&
+          progressSize.width > 0 &&
+          progressSize.height > 0 ? (
             <>
               <line
                 ref={topLineRef}
@@ -717,6 +684,7 @@ export function Capsule({
         </svg>
       ) : null}
 
+      {/* Content: same anchor in both states, scaled via transform when expanded. */}
       <div
         className={
           isExpanded
@@ -728,7 +696,9 @@ export function Capsule({
       >
         {isExpanded && stacked ? (
           <div className="flex min-w-0 flex-col gap-capsule-gap">
-            <div className="min-w-0">{minimizedExpanded ?? minimized}</div>
+            <div className="min-w-0">
+              {minimized}
+            </div>
             {expanded ? (
               <div className="min-w-0 motion-safe:animate-[studia-capsule-in_0.35s_var(--ease-out-soft)]">
                 {expanded}

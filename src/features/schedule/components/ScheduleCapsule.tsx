@@ -141,11 +141,10 @@ export function ScheduleCapsule({
 
   if (flashing && notification) {
     return (
-      <Capsule
-        stacked
-        autoCollapseMs={autoCollapseMs}
-        popKey={notification.id}
-        ariaLabel={`${notification.title}${notification.conclusion ? `: ${notification.conclusion}` : ""}`}
+<Capsule
+          autoCollapseMs={autoCollapseMs}
+          popKey={notification.id}
+          ariaLabel={`${notification.title}${notification.conclusion ? `: ${notification.conclusion}` : ""}`}
         minimized={
           <span className="flex min-w-0 flex-col leading-tight">
             <span className="text-capsule-body font-semibold text-on-surface">
@@ -213,15 +212,14 @@ export function ScheduleCapsule({
           ? `Mañana ${info.startsLabel}`
           : `Nos vemos el ${dayName}`;
     return (
-      <Capsule
-        stacked
-        autoCollapseMs={autoCollapseMs}
-        pulseKey={effectivePulse}
-        ariaLabel={
-          info === null
-            ? headline
-            : `${headline}: ${info.subjectName} a las ${info.startsLabel}`
-        }
+<Capsule
+          autoCollapseMs={autoCollapseMs}
+          pulseKey={effectivePulse}
+          ariaLabel={
+            info === null
+              ? headline
+              : `${headline}: ${info.subjectName} a las ${info.startsLabel}`
+          }
         minimized={
           info === null ? (
             <span className="text-capsule-body font-medium text-on-surface-variant">
@@ -267,11 +265,10 @@ export function ScheduleCapsule({
     const classroomLabel = formatClassroomLabel(state.classroom);
     const professorLabel = formatProfessorLabel(state.professor);
     return (
-      <Capsule
-        tone="accent"
-        stacked
-        autoCollapseMs={autoCollapseMs}
-        pulseKey={effectivePulse}
+<Capsule
+          tone="accent"
+          autoCollapseMs={autoCollapseMs}
+          pulseKey={effectivePulse}
         progressPercent={state.progressPercent}
         ariaLabel={`En clase: ${state.subjectName}, termina a las ${state.endsLabel}`}
         minimized={
@@ -318,10 +315,9 @@ export function ScheduleCapsule({
   const classroomLabel = formatClassroomLabel(state.classroom);
   const professorLabel = formatProfessorLabel(state.professor);
   return (
-    <Capsule
-      stacked
-      autoCollapseMs={autoCollapseMs}
-      pulseKey={effectivePulse}
+<Capsule
+          autoCollapseMs={autoCollapseMs}
+          pulseKey={effectivePulse}
       ariaLabel={`Siguiente clase: ${state.subjectName} a las ${state.startsLabel}`}
       minimized={
         <span className="flex min-w-0 flex-col leading-tight">
