@@ -21,10 +21,11 @@ export const PAGE_ENTER_EASE = "back.out(1.5)";
 export const CAPSULE_MORPH_DURATION = 0.6;
 export const CAPSULE_MORPH_EASE = "power3.out";
 
-// Collapse travels back a touch slower than the expansion, so leaving the
-// expanded card reads as deliberate rather than a snap.
-export const CAPSULE_COLLAPSE_DURATION = 0.8;
-export const CAPSULE_COLLAPSE_EASE = "power3.out";
+// Collapse is the exact reverse of the expansion: same duration, ease mirrored
+// in time (power3.in is the reverse of power3.out), so closing reads as the
+// opening played backward instead of a separate, slower motion.
+export const CAPSULE_COLLAPSE_DURATION = 0.6;
+export const CAPSULE_COLLAPSE_EASE = "power3.in";
 
 // Transient flash announce (collapsed capsule grows to fit a new alert):
 // bouncy so the size change reads as an event, not a layout jump. The

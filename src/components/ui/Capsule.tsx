@@ -35,9 +35,9 @@ interface CapsuleProps {
   popKey?: string | number;
   /** Delay before an expanded capsule collapses back (ms), manual or pulsed. */
   autoCollapseMs?: number;
-  /** 0–100: when provided, draws a progress ring on the capsule border that
-      starts at the middle-left edge and fills up and down at the same time
-      (used for the in-class countdown). */
+  /** 0–100: when provided, draws a progress ring on the capsule border via a
+      CSS mask (the full border revealed across the capsule, left to right)
+      used for the in-class countdown. */
   progressPercent?: number;
   /** "stacked": the anchor replaces the previous right-side detail — it is
       the only content, enlarged through `minimizedExpanded`, with `expanded`
@@ -64,10 +64,6 @@ function usePrefersReducedMotion(): boolean {
 
   return reduced;
 }
-
-const EXPANDED_RADIUS_PX = 20;
-const RING_STROKE_PX = 2;
-const RING_INSET_PX = 1;
 
 /** Per-side padding of the capsule box (px). */
 interface CapsulePadding {
