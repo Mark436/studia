@@ -16,7 +16,7 @@
     "pdfjs-dist": "^6.3.289",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "sith-api-client": "3.1.2"
+    "sith-api-client": "3.2.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",

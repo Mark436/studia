@@ -1,2 +1,2 @@
 minimumReleaseAgeExclude:
-  - sith-api-client@2.2.0 || 2.3.0 || 3.1.2
+  - sith-api-client@3.2.0

@@ -171,11 +171,13 @@ Criterios acordados (decisión dueño, 2026-09-07):
 
 ## 8. Mapeo: fechas de disparo ↔ calendario oficial
 
-Muestra local de referencia (scratch, sin commitear):
-`sample-calendario.pdf` (PDF original) y `sample-calendario.json` (actividades
-con `mes` / `no` / `actividad` / `fecha` consultables). Corresponde al
-**PERIODO ENERO-JULIO 2026** (`CALENDARIO_ESCOLAR_2026-1 V2-2.pdf`, publicado
-desde la página oficial `ith.mx/calendario-escolar.html`).
+Muestra local de referencia: `docs/sample-calendario.json` (actividades con
+`mes` / `no` / `actividad` / `fecha` consultables). Corresponde al
+**PERIODO ENERO-JULIO 2026** (`CALENDARIO_ESCOLAR_2026-1 V2-2.pdf`), extraído
+desde la página oficial `ith.mx/calendario-escolar.html`. Conserva las
+**anomalías del PDF** en su campo `anomalias` (actividad 6 antes que 5, sin
+actividad 36, doble encabezado de la fila 70), por lo que sirve para validar
+el parser contra el documento real sin descargar el PDF.
 
 Relación entre las fechas que fijamos para la búsqueda diaria y lo que el
 calendario reporta:

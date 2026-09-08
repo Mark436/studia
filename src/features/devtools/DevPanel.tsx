@@ -10,6 +10,7 @@ import { ClockSection } from "./components/ClockSection";
 import { GradesSection } from "./components/GradesSection";
 import { InteractionSection } from "./components/InteractionSection";
 import { MateriasSection } from "./components/MateriasSection";
+import { PruebaCompletaSection } from "./components/PruebaCompletaSection";
 import { ReinscripcionTestSection } from "./components/ReinscripcionTestSection";
 import { ToastsSection } from "./components/ToastsSection";
 import type { DevToolsController } from "./useDevConfig";
@@ -62,6 +63,8 @@ export function DevPanel({
       <AdeudosSection dev={dev} onShowToast={onShowToast} />
       <div className="border-t border-outline-variant pt-4" />
       <ReinscripcionTestSection alumno={alumno} />
+      <div className="border-t border-outline-variant pt-4" />
+      <PruebaCompletaSection alumno={alumno} />
       <div className="border-t border-outline-variant pt-4" />
       <InteractionSection
         onSendTestNotification={onSendTestNotification}
