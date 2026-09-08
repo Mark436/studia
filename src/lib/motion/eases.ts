@@ -26,6 +26,12 @@ export const CAPSULE_MORPH_EASE = "power3.out";
 export const CAPSULE_COLLAPSE_DURATION = 0.8;
 export const CAPSULE_COLLAPSE_EASE = "power3.out";
 
+// Transient flash announce (collapsed capsule grows to fit a new alert):
+// bouncy so the size change reads as an event, not a layout jump. The
+// blink (a quick opacity flicker) rides on the same pop.
+export const CAPSULE_FLASH_DURATION = 0.6;
+export const CAPSULE_FLASH_EASE = "back.out(2)";
+
 /** Capsule border-radius morph, tuned not to lag the Flip silhouette. */
 export const CAPSULE_RADIUS_DURATION = 0.5;
 export const CAPSULE_RADIUS_EASE = "power3.out";

@@ -66,8 +66,8 @@ utilidades Tailwind (`text-capsule-*`, `gap-capsule-*`, `p-capsule-*`).
 
 | Token | Valor | Rol |
 | --- | --- | --- |
-| `--text-capsule-display-lg` | 30 px | flash: fase seguimiento |
-| `--text-capsule-display` | 24 px | flash: fase detalle |
+| `--text-capsule-display-lg` | 30 px | flash: énfasis grande (reservado) |
+| `--text-capsule-display` | 24 px | flash: detalle al expandir |
 | `--text-capsule-title` | 20 px | titular "Mañana / Nos vemos el …" |
 | `--text-capsule-headline` | 18 px | salón al desplegar |
 | `--text-capsule-body` | 14 px | materia, salón |
@@ -112,7 +112,7 @@ desaparecieron; la barra inferior orienta la sección.
 | En clase | acento | contador de horas y minutos + salón a la derecha; debajo el nombre corto de la materia |
 | Próxima clase | neutro | contador de horas y minutos + salón; debajo materia resumida |
 | Por hoy terminaste / Sin clases hoy | neutro | "mañana HH:MM" o "nos vemos el {día}"; sin clases en la semana → mensaje calmado |
-| Evento académico | neutro | título del evento + filas de detalle progresivas (detalle → consecuencia) |
+| Evento académico | neutro | título del evento + conclusión; el detalle aparece al expandir |
 
 El contador jerarquiza por tamaño (no por peso): la hora va grande y
 `font-semibold`, la unidad "h" fino; los minutos a la mitad del tamaño y la
@@ -148,11 +148,17 @@ cuenta cruza T-1 min       → "one-minute"
 
 ### Secuencia de eventos académicos (canal cápsula)
 
-Calificaciones nuevas/cambiadas, adeudos y progreso llegan a la cápsula en dos
-fases: detalle (~0.8 s) → seguimiento (~0.7 s) → colapso (la ventana total es
-1.5 s antes de empezar a cerrarse). Ejemplo: "Nueva calificación · Redes · 9.5"
-y después "Promedio del periodo · 8.75". El canal
-es configurable en modo dev → Interacción ("Cápsula" / "Toast"); con toast los
+Calificaciones nuevas/cambiadas, adeudos, progreso y reinscripción llegan a la
+cápsula como un **solo aviso coherente** de tres campos con roles
+complementarios: `title` (titular, qué pasó), `detail` (el dato concreto que
+solo se muestra al expandir, p. ej. "Redes · 9.5") y `conclusion` (la
+consecuencia/resumen que calza colapsada junto al título, p. ej.
+"Promedio · 8.75"). En la píldora colapsada se ven **título + conclusión**; al
+expandir se revela el **detalle**. El aviso es **transitorio**: no se abre
+solo — nace plegado con un **pop bouncy** (escala y tamaño `back.out(2)`
+0.6 s, `popKey`) + **parpadeo**, y se limpia solo tras
+`CAPSULE_FLASH_LIFETIME_MS` (10 s) volviendo al horario. El canal es
+configurable en modo dev → Interacción ("Cápsula" / "Toast"); con toast los
 eventos usan el snackbar clásico. Ambos canales disparan una sola vez por
 evento real.
 - Auto-colapso: la cápsula permanece abierta `DEFAULT_CAPSULE_COLLAPSE_MS`
@@ -164,10 +170,13 @@ evento real.
   backdrop-blur del glass se mantiene rasterizado y constante durante todo el
   tween.
 - El **tamaño crece suave**, no de golpe: `width`/`height` son fit-content
-  (no interpolables), así que el crecimiento se anima vía el `padding` del
-  botón (sí interpolable, transición CSS 300 ms) y el expandido gana un
-  ancho mínimo (`min-w-64`, 16 rem). El radio sí permanece snap por estado
-  (constraint del `backdrop-filter`).
+  (no interpolables), así que cada estado mide su tamaño natural y GSAP tweena
+  `width`/`height`/`x` juntos desde el tamaño del otro estado (el `from` se
+  aplica antes de pintar, sin flash). Al terminar, la caja vuelve a auto y el
+  anillo (si lo hay) se re-pega al borde vía ResizeObserver. El expandido gana
+  un ancho mínimo (`min-w-64`, 16 rem) que durante el tween se libera
+  temporalmente. El radio sí permanece snap por estado (constraint del
+  `backdrop-filter`).
 - La apertura usa **0.6 s** `power3.out`; el colapso vuelve un poco más lento
   (**0.8 s**), para que dejar la tarjeta se lea como deliberado. La posición,
   al ser propiedad del transform, nunca la resetea React a mitad de camino.
@@ -191,7 +200,8 @@ Es la única variante; no hay toggle de forma.
 ### Radio
 
 El radio se define por estado (clases `rounded-full` / `rounded-[20px]`) y
-**no se anima** (GSAP solo tweena la posición `x`): tweenear el radio de un
+**no se anima** (GSAP tweena el tamaño `width`/`height` y la posición `x`,
+nunca el radio): tweenear el radio de un
 elemento con `backdrop-filter` obliga al navegador a re-muestrear el desenfoque
 frame a frame, que se lee como el blur "animando". `border-radius: calc(h/2)`
 en píldora — nunca `9999px`.
@@ -203,13 +213,14 @@ transiciones CSS para micro-feedback. Sin librerías adicionales.
 
 | Momento | Tratamiento |
 | --- | --- |
-| Morfo de cápsula | GSAP tween geométrico `power3.out` (apertura 0.6 s, colapso 0.8 s; transform `x` compuesta; el radio no se tweenea y el ancla `stacked` cambia a su variante grande sin reemplazarse). El `padding` crece con transición CSS 300 ms (suaviza el fit-content) |
+| Morfo de cápsula | GSAP tween geométrico `power3.out` (apertura 0.6 s, colapso 0.8 s): `width`/`height` + transform `x` compuesta desde el tamaño del estado previo; el radio no se tweenea y el ancla `stacked` cambia a su variante grande sin reemplazarse |
 | Desliz del indicador activo (barra inferior) | GSAP `translateX` `back.out(1.6)` 0.5 s; posiciona sin tween con `prefers-reduced-motion` |
 | Transición de contenido entre tabs | Salida `power2.in` 0.18 s (fade + subida), entrada `back.out(1.5)` 0.5 s (rise + rebote); líquida sobre un solo contenedor persistente |
 | Números héroe | contador GSAP `power3.out` 0.9 s (`AnimatedNumber`) |
 | Toque (botones, cápsula) | `active:scale-[0.97]` CSS 150 ms |
 | Hora actual / clase en curso | punto que respira (`studia-breathe` 2.6 s, `motion-safe`) |
 | Entrada de contenido de cápsula | `studia-capsule-in` 0.35 s (fade + subida suave; el anchor no se refluye) |
+| Flash de evento académico (plegado) | pop bouncy `back.out(2)` 0.6 s (escala + tamaño vía `popKey`) + parpadeo de opacidad |
 | Entrada de toast | `studia-fade-up` 0.3 s |
 | Pull-to-refresh | indicador spinner existente, opacidad ligada al gesto |
 

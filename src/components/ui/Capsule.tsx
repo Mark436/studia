@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FocusEvent, KeyboardEvent } from "react";
 import type { ReactNode } from "react";
 import gsap from "gsap";
 import {
   CAPSULE_COLLAPSE_DURATION,
   CAPSULE_COLLAPSE_EASE,
+  CAPSULE_FLASH_DURATION,
+  CAPSULE_FLASH_EASE,
   CAPSULE_MORPH_DURATION,
   CAPSULE_MORPH_EASE,
 } from "@/lib/motion/eases";
@@ -25,6 +27,10 @@ interface CapsuleProps {
   minimizedExpanded?: ReactNode;
   /** Change this key to trigger one expand pulse (important events only). */
   pulseKey?: string | number;
+  /** Change this key while collapsed to play a bouncy "pop" (blink + size
+      tween toward the new natural size) without expanding — used by the
+      transient academic flash. */
+  popKey?: string | number;
   /** Delay before an expanded capsule collapses back (ms), manual or pulsed. */
   autoCollapseMs?: number;
   /** 0–100: when provided, draws a progress ring on the capsule border that
@@ -111,6 +117,7 @@ export function Capsule({
   minimizedExpanded,
   expanded,
   pulseKey,
+  popKey,
   autoCollapseMs = 1500,
   progressPercent,
   stacked = false,
@@ -126,6 +133,18 @@ export function Capsule({
   const elementRef = useRef<HTMLButtonElement>(null);
   const collapseTimerRef = useRef<number | undefined>(undefined);
   const previousPulseRef = useRef(pulseKey);
+  const previousPopKeyRef = useRef(popKey);
+  const popTimelineRef = useRef<ReturnType<typeof gsap.timeline> | null>(null);
+  // Natural sizes of both states so the morph can travel width/height px when
+  // the content swap happens (fit-content is not interpolable by GSAP).
+  const collapsedSizeRef = useRef<{ width: number; height: number } | null>(
+    null,
+  );
+  const expandedSizeRef = useRef<{ width: number; height: number } | null>(
+    null,
+  );
+  const prevExpandedRef = useRef(isExpanded);
+  const morphingRef = useRef(false);
   const reducedMotion = usePrefersReducedMotion();
 
   function clearCollapseTimer() {
@@ -210,35 +229,190 @@ export function Capsule({
   }
 
   // After React commits the new layout, travel to (or from) the centered
-  // position. `x` is a composited transform: the backdrop filter never
-  // re-renders frame-by-frame and every collapse plays the full duration.
-  // Collapse is a touch slower than the expansion so leaving reads as
-  // deliberate.
-  useEffect(() => {
+  // position AND grow/shrink the box to match the new content. Width/height
+  // are fit-content (not interpolable), so each state's natural size is
+  // measured and the other state's size is applied as the from-value while
+  // GSAP tweens width/height/x together. Runs before paint so the swap into
+  // the expanded content never flashes at full size. On completion the box
+  // returns to content-fit (auto) and the ring's ResizeObserver re-hugs the
+  // border. Collapse is a touch slower than the expansion so leaving reads as
+  // deliberate. A re-toggle mid-tween kills the running tween and resumes
+  // from the current visual size instead of being ignored.
+  useLayoutEffect(() => {
     const element = elementRef.current;
-    if (element === null || reducedMotion) return;
+    if (element === null) return;
 
     const parent = element.parentElement;
-    const targetX =
-      isExpanded && parent !== null
-        ? Math.max(0, (parent.clientWidth - element.offsetWidth) / 2)
-        : 0;
+    if (parent === null) return;
 
+    const changed = prevExpandedRef.current !== isExpanded;
+    prevExpandedRef.current = isExpanded;
+
+    if (reducedMotion || !changed) {
+      // Still capture the rest-size of the committed state so the first real
+      // morph has a from-value (and the ring has settled dimensions).
+      if (!morphingRef.current) {
+        if (isExpanded) {
+          expandedSizeRef.current = {
+            width: element.offsetWidth,
+            height: element.offsetHeight,
+          };
+        } else {
+          collapsedSizeRef.current = {
+            width: element.offsetWidth,
+            height: element.offsetHeight,
+          };
+        }
+      }
+      return;
+    }
+
+    const fromRef = isExpanded
+      ? collapsedSizeRef.current
+      : expandedSizeRef.current;
+    // If a morph is in flight the box is pinned to the animated size; snap up
+    // from there instead of from a rest state (rare mid-tween re-toggle).
+    const inFlight = gsap.getTweensOf(element).length > 0;
+    const fromWidth = inFlight ? element.offsetWidth : fromRef?.width;
+    const fromHeight = inFlight ? element.offsetHeight : fromRef?.height;
+    const fromX = inFlight ? gsap.getProperty(element, "x") : 0;
+
+    gsap.killTweensOf(element);
+    // Unpin (no-op on a resting element) to read the true natural size of the
+    // committed content — the morph target.
+    element.style.width = "";
+    element.style.height = "";
+    element.style.minWidth = "";
+    gsap.set(element, { x: 0, scale: 1, opacity: 1 });
+    const targetWidth = element.offsetWidth;
+    const targetHeight = element.offsetHeight;
+    if (targetWidth <= 0 || targetHeight <= 0) return;
+
+    if (isExpanded) {
+      expandedSizeRef.current = { width: targetWidth, height: targetHeight };
+    } else {
+      collapsedSizeRef.current = { width: targetWidth, height: targetHeight };
+    }
+
+    const targetX = isExpanded
+      ? Math.max(0, (parent.clientWidth - targetWidth) / 2)
+      : 0;
+
+    morphingRef.current = true;
+    // Allow the from-side to dip under min-w-64 while the width tween runs;
+    // the class min-width is restored on complete.
+    if (fromWidth !== undefined) {
+      gsap.set(element, {
+        width: fromWidth,
+        height: fromHeight ?? fromWidth,
+        minWidth: 0,
+        x: Number(fromX),
+      });
+    }
     gsap.to(element, {
+      width: targetWidth,
+      height: targetHeight,
       x: targetX,
       duration: isExpanded
         ? CAPSULE_MORPH_DURATION
         : CAPSULE_COLLAPSE_DURATION,
       ease: isExpanded ? CAPSULE_MORPH_EASE : CAPSULE_COLLAPSE_EASE,
       overwrite: "auto",
+      onComplete() {
+        element.style.width = "";
+        element.style.height = "";
+        element.style.minWidth = "";
+        morphingRef.current = false;
+      },
     });
   }, [isExpanded, reducedMotion]);
+
+  // Transient pop while collapsed: a swapped-in flash is announced with a
+  // bouncy size/scale spring toward its new natural size plus a quick double
+  // blink, so an event reads as "something happened" without the card opening
+  // on its own. Skips when the capsule is mid-morph or already expanded.
+  useLayoutEffect(() => {
+    if (popKey === undefined || popKey === "") return;
+    if (previousPopKeyRef.current === popKey) return;
+    previousPopKeyRef.current = popKey;
+
+    const element = elementRef.current;
+    if (element === null || reducedMotion || isExpanded) return;
+
+    const fromSize = collapsedSizeRef.current;
+
+    gsap.killTweensOf(element);
+    popTimelineRef.current?.kill();
+    // Unpin to read the true natural size of the committed flash content.
+    element.style.width = "";
+    element.style.height = "";
+    element.style.minWidth = "";
+    gsap.set(element, { x: 0, scale: 1, opacity: 1 });
+    const targetWidth = element.offsetWidth;
+    const targetHeight = element.offsetHeight;
+    if (targetWidth <= 0 || targetHeight <= 0) return;
+
+    morphingRef.current = true;
+    if (fromSize !== null) {
+      gsap.set(element, {
+        width: fromSize.width,
+        height: fromSize.height,
+        minWidth: 0,
+        scale: 0.96,
+        opacity: 1,
+      });
+    }
+
+    const timeline = gsap.timeline({
+      onComplete() {
+        element.style.width = "";
+        element.style.height = "";
+        element.style.minWidth = "";
+        gsap.set(element, { scale: 1, opacity: 1 });
+        morphingRef.current = false;
+        collapsedSizeRef.current = { width: targetWidth, height: targetHeight };
+      },
+    });
+    popTimelineRef.current = timeline;
+
+    timeline
+      .to(
+        element,
+        {
+          width: targetWidth,
+          height: targetHeight,
+          scale: 1,
+          duration: CAPSULE_FLASH_DURATION,
+          ease: CAPSULE_FLASH_EASE,
+          overwrite: "auto",
+        },
+        0,
+      )
+      // Double blink right where the event lands.
+      .fromTo(
+        element,
+        { opacity: 0.35 },
+        { opacity: 1, duration: 0.09, ease: "power1.out" },
+        0,
+      )
+      .to(element, { opacity: 0.65, duration: 0.05, ease: "power1.in" }, 0.12)
+      .to(element, { opacity: 1, duration: 0.06, ease: "power1.out" }, 0.17);
+  }, [popKey, isExpanded, reducedMotion]);
+
+  useEffect(
+    () => () => {
+      popTimelineRef.current?.kill();
+    },
+    [],
+  );
 
   // Border-radius is static per state (classes `rounded-full` / `rounded-[20px]`)
   // and never tweened: animating radius on a backdrop-filter element re-samples
   // the blur frame by frame. skipped on purpose — see comment on Capsule.
 
-  // Track the capsule box so the ring hugs its border at every size.
+  // Track the capsule box so the ring hugs its border at every size. Updates
+  // are skipped while the morph tween runs (the box size is in flight); the
+  // final RestoreObserver read lands once sizing returns to auto.
   useEffect(() => {
     const element = elementRef.current;
     if (element === null || progressPercent === undefined) {
@@ -246,8 +420,10 @@ export function Capsule({
       return;
     }
 
-    const update = () =>
+    const update = () => {
+      if (morphingRef.current) return;
       setRingSize({ width: element.offsetWidth, height: element.offsetHeight });
+    };
     update();
 
     const observer = new ResizeObserver(update);

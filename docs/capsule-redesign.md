@@ -163,44 +163,56 @@ semana, queda el mensaje calmado y la app sigue funcionando.
   lunes"), `text-capsule-body font-semibold text-primary-strong`.
 - Sin clases en la semana → `Consulta otro día desde tu horario.`
   (`text-capsule-body font-medium text-on-surface-variant`).
+ 
 
-**Desplegado:**
-- Mantiene el mensaje del plegado grande (`font-display text-capsule-title
-  font-bold`): `Mañana HH:MM` / `Nos vemos el {día}`.
-- Debajo: la referencia al día (`mañana` o el nombre del día,
-  `text-capsule-caption uppercase tracking`) y bajo ella la **materia resumida**
-  (`shortenSubjectName`) con su hora (`text-capsule-body`, materia en
-  `font-semibold text-on-surface`).
+**Desplegado:** CAMBIOS HECHOS — ahora es `stacked`, siguiendo la lógica de las
+otras cápsulas: el ancla (`minimizedExpanded`) es el contenido del plegado en
+variante tipográfica grande, sin repetir `mañana`/día abajo (ya fecha el
+plegado; se eliminó la línea de referencia al día que duplicaba el dato).
+- Ancla (`minimizedExpanded`): mensaje del plegado grande `font-display
+  text-capsule-title font-bold`: `Mañana HH:MM` / `Nos vemos el {día}`.
+- Bloque desplegado (`expanded`): materia resumida (`shortenSubjectName`) con
+  su hora (`text-capsule-body`, materia en `font-semibold text-on-surface`,
+  hora `tabular-nums`), todo `truncate`.
 - Sin clases en la semana → solo el mensaje `Consulta otro día desde tu
-  horario.`.
-- CAMBIOS HECHOS (ajustable): sin horas, `mañana` / `nos vemos el día`,
-  mensaje + día + materia resumida al desplegar.
+  horario.` (sin bloque extra al desplegar).
+- CAMBIOS HECHOS (ajustable): migrado a `stacked`; ancla grande del mensaje
+  del plegado; sin la referencia al día duplicada; materia + hora abajo.
 
 ### 5.5 Flash de evento académico — tono neutro, `stacked`
 
 Ruta `notification` (calificaciones nuevas, adeudos, progreso, reinscripción).
-Secuencia: detalle (~0.8 s) → seguimiento (~0.7 s) → colapso (ventana total
-1.5 s antes de empezar a cerrarse). Canal configurable
-(cápsula / toast) — mismo evento una sola vez.
+Un solo aviso coherente con tres campos complementarios: `title` (qué pasó),
+`detail` (el dato concreto que solo se muestra al expandir) y `conclusion` (la
+consecuencia/resumen que calza colapsada). **Transitorio**: el aviso se limpia
+solo tras `CAPSULE_FLASH_LIFETIME_MS` (10 s) y la cápsula vuelve al horario.
+No se abre al llegar: nace **plegado** con un **pop bouncy** (escala y tamaño
+`back.out(2)` 0.6 s, `popKey` en `Capsule`) + **parpadeo** (doble blink de
+opacidad); el plegado crece hacia su nuevo tamaño (título + conclusión) para
+que se entienda que algo cambió, sin abrir la tarjeta. Si el usuario la abre,
+se revela el detalle. Canal configurable (cápsula / toast) — mismo evento una
+sola vez.
 
-**Plegado** — el detalle deja de estar a la derecha: **filas apiladas que
-aparecen línea por línea** (cada una con `studia-capsule-in`):
+CAMBIOS HECHOS: el flash ya no se abre solo (se quitó el pulso); pop bouncy +
+parpadeo al llegar; vida útil de 10 s (`CAPSULE_FLASH_LIFETIME_MS`), luego se
+limpia. El detalle solo aparece si el usuario abre la cápsula.
+
+**Plegado** — filas apiladas (título + conclusión; el detalle no aparece):
 - Línea 1 — título `text-capsule-body font-semibold text-on-surface`
   (ej. "Nueva calificación").
-- Luego la fase detalle agrega `notification.detail`
-  (`text-capsule-body font-medium text-on-surface-variant`, ej. "Matemáticas
-  10"); en fase seguimiento aparece `followUpDetail`
+- Línea 2 — `notification.conclusion`
   (`text-capsule-body font-medium tabular-nums text-primary-strong`, ej.
   "Promedio · 8.75").
+  
 
 **Desplegado (`stacked`)** — ancla con el título (`text-capsule-headline`) y
-las filas; bloque de énfasis bajo la materia:
-- Fase detalle: eyebrow `notification.title` + `notification.detail`
-  `font-display text-capsule-display font-bold leading-tight`.
-- Fase seguimiento: eyebrow `followUpTitle` + `followUpDetail` `font-display
-  text-capsule-display-lg font-bold tabular-nums text-primary-strong`.
-- CAMBIOS HECHOS (ajustable): migrado a `stacked`; filas progresivas; el
-  desplegado muestra título → detalle → consecuencia.
+la conclusión; bloque de énfasis bajo la materia con el detalle:
+- Eyebrow `notification.title` + `notification.detail` `font-display
+  text-capsule-display font-bold leading-tight` + `notification.conclusion`
+  (`text-capsule-body tabular-nums text-primary-strong`).
+- CAMBIOS HECHOS (ajustable): migrado a `stacked`; título + conclusión
+  plegados, detalle al expandir; se eliminó la secuencia en dos fases
+  (detalle → seguimiento).
 
 ## Pendientes (para seguir dictando) + calibración abierta
 

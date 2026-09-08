@@ -26,11 +26,6 @@ interface ScheduleCapsuleProps {
   autoCollapseMs: number;
 }
 
-const DETAIL_STAGE_MS = 800;
-const FLASH_TOTAL_MS = 1500;
-
-type FlashStage = "detail" | "followup" | null;
-
 const WEEKDAY_NAMES = [
   "domingo",
   "lunes",
@@ -137,70 +132,30 @@ export function ScheduleCapsule({
     setPulseKey(`${eventKey}:${Date.now()}`);
   }, [currentTick]);
 
-  // Notification sequence: detail first ("Matemáticas 10"), then the follow-up
-  // ("Promedio · 8.75"), then back to classes.
-  const [flashStage, setFlashStage] = useState<FlashStage>(null);
-  const flashTimersRef = useRef<number[]>([]);
-
-  useEffect(() => {
-    for (const timer of flashTimersRef.current) window.clearTimeout(timer);
-    flashTimersRef.current = [];
-
-    if (notification === null) {
-      setFlashStage(null);
-      return;
-    }
-
-    setFlashStage("detail");
-    flashTimersRef.current.push(
-      window.setTimeout(() => setFlashStage("followup"), DETAIL_STAGE_MS),
-      window.setTimeout(() => setFlashStage(null), FLASH_TOTAL_MS),
-    );
-
-    return () => {
-      for (const timer of flashTimersRef.current) window.clearTimeout(timer);
-      flashTimersRef.current = [];
-    };
-  }, [notification]);
-
-  const flashing = flashStage !== null && notification !== null;
-  const effectivePulse =
-    notification !== null
-      ? `flash:${notification.id}`
-      : pulseKey === ""
-        ? undefined
-        : pulseKey;
-  const effectiveCollapseMs = flashing ? FLASH_TOTAL_MS : autoCollapseMs;
+  // Notification flash: one coherent alert (title + conclusion visible while
+  // collapsed; detail appears on expand). The pop announces the arrival while
+  // the capsule stays collapsed (no auto-open); the notification clears itself
+  // after CAPSULE_FLASH_LIFETIME_MS (see app/App.tsx).
+  const flashing = notification !== null;
+  const effectivePulse = pulseKey === "" ? undefined : pulseKey;
 
   if (flashing && notification) {
-    const row = {
-      detailLabel: flashStage === "detail" ? notification.detail : undefined,
-      consequence:
-        flashStage === "followup" ? notification.followUpDetail : undefined,
-    };
     return (
       <Capsule
         stacked
-        autoCollapseMs={effectiveCollapseMs}
-        pulseKey={effectivePulse}
-        ariaLabel={`${notification.title}${notification.detail ? `: ${notification.detail}` : ""}`}
+        autoCollapseMs={autoCollapseMs}
+        popKey={notification.id}
+        ariaLabel={`${notification.title}${notification.conclusion ? `: ${notification.conclusion}` : ""}`}
         minimized={
           <span className="flex min-w-0 flex-col leading-tight">
             <span className="text-capsule-body font-semibold text-on-surface">
               {notification.title}
             </span>
-            {row.detailLabel ? (
-              <span
-                className={`${FLASH_ROW_IN} truncate text-capsule-body font-medium text-on-surface-variant`}
-              >
-                {row.detailLabel}
-              </span>
-            ) : null}
-            {row.consequence ? (
+            {notification.conclusion ? (
               <span
                 className={`${FLASH_ROW_IN} truncate text-capsule-body font-medium tabular-nums text-primary-strong`}
               >
-                {row.consequence}
+                {notification.conclusion}
               </span>
             ) : null}
           </span>
@@ -210,44 +165,31 @@ export function ScheduleCapsule({
             <span className="text-capsule-headline font-semibold text-on-surface">
               {notification.title}
             </span>
-            {row.detailLabel ? (
-              <span
-                className={`${FLASH_ROW_IN} truncate text-capsule-body font-medium text-on-surface-variant`}
-              >
-                {row.detailLabel}
-              </span>
-            ) : null}
-            {row.consequence ? (
+            {notification.conclusion ? (
               <span
                 className={`${FLASH_ROW_IN} truncate text-capsule-body font-medium tabular-nums text-primary-strong`}
               >
-                {row.consequence}
+                {notification.conclusion}
               </span>
             ) : null}
           </span>
         }
         expanded={
-          flashStage === "followup" && notification.followUpTitle ? (
-            <>
-              <span className="text-capsule-caption font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
-                {notification.followUpTitle}
+          <>
+            <span className="text-capsule-caption font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+              {notification.title}
+            </span>
+            {notification.detail ? (
+              <span className="font-display text-capsule-display font-bold leading-tight text-on-surface">
+                {notification.detail}
               </span>
-              <span className="font-display text-capsule-display-lg font-bold tabular-nums text-primary-strong">
-                {notification.followUpDetail ?? ""}
+            ) : null}
+            {notification.conclusion ? (
+              <span className="truncate text-capsule-body font-medium tabular-nums text-primary-strong">
+                {notification.conclusion}
               </span>
-            </>
-          ) : (
-            <>
-              <span className="text-capsule-caption font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
-                {notification.title}
-              </span>
-              {notification.detail ? (
-                <span className="font-display text-capsule-display font-bold leading-tight text-on-surface">
-                  {notification.detail}
-                </span>
-              ) : null}
-            </>
-          )
+            ) : null}
+          </>
         }
       />
     );
@@ -271,6 +213,7 @@ export function ScheduleCapsule({
           : `Nos vemos el ${dayName}`;
     return (
       <Capsule
+        stacked
         autoCollapseMs={autoCollapseMs}
         pulseKey={effectivePulse}
         ariaLabel={
@@ -289,25 +232,24 @@ export function ScheduleCapsule({
             </span>
           )
         }
-        expanded={
+        minimizedExpanded={
           info === null ? (
-            <span className="text-capsule-body text-on-surface-variant">
+            <span className="text-capsule-body font-medium text-on-surface-variant">
               {headline}
             </span>
           ) : (
-            <>
-              <span className="font-display text-capsule-title font-bold leading-tight text-on-surface">
-                {headline}
-              </span>
-              <span className="text-capsule-caption font-medium uppercase tracking-[0.14em] text-on-surface-variant">
-                {isTomorrow ? "mañana" : dayName}
-              </span>
-              <span className="truncate text-capsule-body text-on-surface-variant">
-                <span className="font-semibold text-on-surface">{subjectLabel}</span>
-                {" · "}
-                <span className="tabular-nums">{info.startsLabel}</span>
-              </span>
-            </>
+            <span className="font-display text-capsule-title font-bold leading-tight text-on-surface">
+              {headline}
+            </span>
+          )
+        }
+        expanded={
+          info === null ? null : (
+            <span className="truncate text-capsule-body text-on-surface-variant">
+              <span className="font-semibold text-on-surface">{subjectLabel}</span>
+              {" · "}
+              <span className="tabular-nums">{info.startsLabel}</span>
+            </span>
           )
         }
       />
