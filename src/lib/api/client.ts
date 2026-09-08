@@ -4,21 +4,28 @@ import {
   SithHttpError,
   SithNetworkError,
 } from "sith-api-client";
+import { ESTADO_MATERIA_RETICULA } from "sith-api-client";
 import type {
   Alumno,
   Aviso,
   Boleta,
   CalificacionMateria,
+  Coordenadas,
   Credenciales,
   DatosAlumno,
+  ReticulaMateria,
 } from "sith-api-client";
+
+export { ESTADO_MATERIA_RETICULA };
 
 export type {
   Alumno,
   Aviso,
   Boleta,
   CalificacionMateria,
+  Coordenadas,
   Credenciales,
+  ReticulaMateria,
 };
 
 export type ApiErrorKind = "invalid-credentials" | "connection" | "unknown";

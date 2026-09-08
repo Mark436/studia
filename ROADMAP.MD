@@ -422,3 +422,138 @@ futuro cuando se obtiene.
 - [x] Sección de prueba en dev (`ReinscripcionTestSection`): ver cuánto falta según escenario (24h/30min/empezó/pasó/sin fecha), combinable con el reloj simulado.
 - [x] Pruebas de la lógica pura con reloj inyectado (`reinscripcion.test.ts`).
 - [ ] Evaluar push programado en segundo plano (futuro `discovered` sin abrir la app): requiere backend con sesión/token; ver `docs/api.md`.
+
+## 17. Sugerir horario + búsquedas diarias (rama `test/sugerir-horario`) — PLAN
+
+Objetivo: cuando el instituto publique el calendario, y luego el prehorario de la
+carrera, la app lo detecte sola (búsqueda diaria) para poder sugerir un horario
+antes de la inscripción.
+
+### Logrado en esta rama
+- [x] Descubrir el prehorario de la carrera desde el listado público de
+  `ith.mx/documentos/` ordenado por modificación (`?C=M;O=D`), con desempate
+  por recencia cuando el nombre está cerca (umbral de tokens) y **jamás** un
+  prehorario de otra carrera (`src/lib/prehorario.ts` + tests).
+- [x] Calcular las materias por cursar desde la retícula (`getMateriasPendientes`,
+  estados acreditados = 2/3/4 vía `codigoEstado`).
+- [x] URL canónica del prehorario elegido (`urlPrehorario`).
+- [x] Fecha de modificación de cada archivo del listado (`parseArchivosConFecha`);
+  el botón de prehorario y el nuevo de calendario la validan contra `getNow()`
+  (reloj del modo dev) con una ventana de 7 días.
+- [x] **Calendario oficial = fuente única**: la página
+  `ith.mx/calendario-escolar.html` incrusta el PDF vigente (`<embed src>` /
+  `ul.doc a`). `obtenerCalendarioOficial()` lo extrae y es la única fuente para
+  decidir qué calendario usar: no se selecciona escaneando el listado de
+  documentos por nombre `*calendario*` (se retiró `elegirCalendario`).
+- [x] Prueba de **calendario**: extrae el PDF de la página oficial
+  (`obtenerCalendarioOficial`) y lee sus fechas de inicio de labores con pdfjs;
+  ya no cruza ni imprime candidatos del listado de documentos.
+- [x] **Desempate por tokens distintivos**: se descartan los genéricos
+  (INGENIERIA, LICENCIATURA, EN, E, DE, DEL, LA, EL, UN, UNA, AL), los nombres
+  sin espacio se parten por el punto (`ING.INFORMATICA` → ING + INFORMATICA) y
+  `LIC` se expande a LICENCIATURA (de nuevo genérica). Regresión: «ING. EN
+  AERONÁUTICA» gana su prehorario y no lo roba el de ISC (inflación por
+  EN/INGENIERIA).
+- [x] **Máquina de fases del chequeo diario** (`src/lib/busquedaHorarios.ts`,
+  lógica pura): dos **ventanas anuales** (15-dic → calendario ENE-JUN, 15-mayo
+  → calendario AGO-DIC); dentro de la ventana `buscar-calendario` →
+  `procesar-calendario` (extraer fechas del PDF) → `esperar-prehorario` hasta la
+  **fecha de la actividad 5** (fallback labores + 1 día) → `buscar-prehorario`
+  → `completado`; al arrancar una ventana nueva `siguiente-ventana` reinicia el
+  ciclo. **Sin gate de horas**: el estado persiste (IndexedDB) y el avance **no
+  depende de una sesión actualizada**.
+- [x] **Harness de prueba en modo dev**: sección «Chequeo diario» con botón
+  **«Validar fecha (+24h)»** que simula el evento aunque la sesión esté
+  desactualizada, input para fijar la fecha de inicio de labores y botón de
+  reinicio; cruza con `getNow()` (reloj del modo dev) y ejecuta la acción de la
+  fase (fetch del calendario oficial / del prehorario, según toque).
+- [x] **Leer el calendario oficial** (pdfjs, import dinámico): `leerFechasInicioLabores`
+  extrae las fechas de «inicio de labores» del PDF y `extraerFechasPublicacionPrehorarios`
+  la de la **actividad 5** (publicación de orden de reinscripción + Prehorarios):
+  día en la celda, mes por encabezado de columna, año del periodo. La fase
+  `procesar-calendario` guarda ambas (`fechaInicioLabores` /
+  `fechaPublicacionPrehorarios`); la de la actividad 5 dispara `buscar-prehorario`
+  y el aviso de **turnos de reinscripción**.
+  - Regla de año de labores: el ciclo inicia en agosto; meses < 8 pertenecen al
+    ciclo siguiente (corrige el «6 de enero 2026/2027» del PDF). La actividad 5
+    **no** sufre esa regla (siempre está en el primer mes del periodo).
+  - `parseCalendarioOficial` elige el **calendario vigente** (mayor año) cuando
+    la página embebe varios PDFs.
+- [x] **CORS en producción: decisión tomada** — fetch directo sin relay (el
+  usuario descartó el proxy propio); `ith.mx` no manda `Access-Control-Allow-Origin`,
+  así que en producción el fetch del navegador puede bloquearse; en dev lo
+  resuelve el proxy de vite. Revisitar solo si se confirma que la app vivirá en
+  otro origen.
+
+- [x] **Lectura de PDF separada del calendario**: `leerTextoPDF` /
+  `urlDocumentoPdf` viven en `src/lib/pdfTexto.ts` (worker de pdf.js), sin
+  lógica de calendario; `leerFechasInicioLabores` solo interpreta fechas sobre
+  ese texto. Prueba en modo dev: «Probar PDF de prehorario (texto)» descarga
+  el prehorario de la carrera y muestra las primeras líneas extraídas para
+  decidir el JSON de las tablas.
+- [x] **Leer el PDF del prehorario → JSON de tablas**: `leerRenglonesPDF` en
+  `src/lib/pdfTexto.ts` extrae el texto **con posiciones (x, y)** porque el
+  texto plano pierde las columnas. `procesarPrehorarioTexto` en
+  `src/lib/prehorarioTablas.ts` agrupa por fila (umbral vertical ~6 pt),
+  clasifica celdas por zona de columna (Clave, Gpo, Materia, T, P, C, HRS,
+  MAESTRO, AULA, Lun..Vie), une la clave cuando va debajo de sus datos y
+  reensambla maestros/aulas que envuelven, y devuelve el mismo formato que
+  `samplegrupos.json`: `{ S5: { materias: [{ clave, nombre, horas, creditos,
+  grupos: [{ grupo, paquete, turno, especialidad, maestro, aula, horario }] }] } }`
+  (horas `"07:00-08:00"`, claves de día `lunes..viernes`). El botón «Probar
+  retícula + prehorario» ahora también imprime ese JSON en el pre de devtools.
+  Validado contra el PDF real de ISC 2026-2 (5 semestres, 43 materias, 121
+  grupos) y con `prehorarioTablas.test.ts`. Nota: el agrupado por `S#` deriva
+  del GPO; paquete/turno/especialidad son best-effort de la cabecera de sección
+  más reciente (la atribución exacta no siempre es posible).
+
+### Pendiente (plan)
+- [ ] **Generar sugerencias de horario**: combinar materias pendientes con los
+  grupos del prehorario para proponer un horario (criterios por definir:
+  sin choques, bloques, carga por día, etc.).
+  - [x] **Materias que tocan ya**: `getMateriasDisponibles` en
+    `src/features/student/reticulaPendiente.ts` decide qué materias pendientes
+    tienen su seriación satisfecha con la retícula actual (cada grupo «o»
+    exige UNA coordenada acreditada; AND entre grupos). No corta por
+    `alumno.semestre`, así que sirve para alumnos regulares y con materias
+    adelantadas. `x` (semestre) y `y` (fila) son las coordenadas de la
+    retícula del API; la seriación viene en `r` → `seriacion`. El botón
+    «Probar sugerencia de horario» lista pendientes, marca ✅ las que tocan ya
+    / ⛔ las bloqueadas (con su explicación) y solo busca en el prehorario las
+    disponibles. Ver `reticulaPendiente.test.ts`.
+  - [x] **Algoritmo de sugerencia v1** (`src/lib/sugerirHorario.ts` + tests):
+    restricción dura **sin choques**, maximiza materias cubiertas y minimiza
+    huecos entre clases; las excluidas llevan razón (`sin-grupos-en-prehorario`
+    / `no-cabe-sin-choque`). Lógica pura, determinista (orden de entrada como
+    desempate); la función de puntaje es el punto de extensión para criterios
+    futuros.
+  - [ ] Criterios futuros de puntaje (evitar maestro, tamaño máximo de hueco,
+    priorizar horas) y UI para configurarlos; dónde se consume (harness dev /
+    área Alumno) pendiente de decidir. Ver `docs/sugerir-horario.md` §7.
+
+### Búsquedas diarias (mismo listado `ith.mx/documentos/`)
+
+Catálogo central de **eventos, disparadores y cadencias**: [`docs/sugerir-horario.md`](docs/sugerir-horario.md).
+
+- [x] Chequeo diario implementado como fases (15-dic/15-mayo calendario →
+  actividad 5 prehorario → completado) **anclado a las 18:00**, sin gate de
+  horas; estado persistido y testeable desde el modo dev sin esperar fechas.
+- [x] Disparador "diario" en producción: `useHorariosCheck` corre al abrir la
+  app, al volver a foreground (`visibilitychange`/`pageshow`/`focus`), al
+  recuperar la conexión (`online`) y con un **timer que re-agenda el próximo
+  18:00** (`proximoMomentoChequeo`) mientras la app está abierta. Antes de las
+  18:00 no toca el API. En el working tree, sin commitear.
+- [x] **Guard de modo offline** en el chequeo diario: sin conexión no se busca
+  ni se persiste; el listener `online` vuelve a disparar — ver
+  `docs/sugerir-horario.md` §2.
+- [x] Cadencia de re-consulta de la página oficial tras el inicio de labores:
+  decidido **1 vez por día a las 18:00** (sin gate de horas; la fase
+  `buscar-prehorario` se re-evalúa en cada chequeo). El disparo usa la **fecha
+  de la actividad 5**; el fallback `labores + 1 día` solo aplica si el PDF no
+  trae la actividad.
+- [x] **Aviso de turnos de reinscripción**: cuando la fecha de la actividad 5
+  es hoy o ya pasó, el bucle de las 18:00 avisa una sola vez
+  (`avisoTurnosEnviado`) y el nudge de refrescar lo menciona al sugerir
+  actualizar datos. No existe un archivo «SIG»: el **15 de mayo** es la segunda
+  **ventana del calendario** (ciclo AGO-DIC) y la detección es por cambio del
+  **PDF incrustado** en `ith.mx/calendario-escolar.html`.

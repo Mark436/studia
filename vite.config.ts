@@ -10,13 +10,26 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  worker: {
+    format: "es",
+  },
   server: {
+    host: true,
+    allowedHosts: true,
     proxy: {
       "/api/sith": {
         target: "http://sith.ith.mx/XTodo/wr",
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api\/sith/, ""),
+      },
+      "/documentos": {
+        target: "https://ith.mx",
+        changeOrigin: true,
+      },
+      "/calendario-escolar.html": {
+        target: "https://ith.mx",
+        changeOrigin: true,
       },
     },
   },
