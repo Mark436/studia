@@ -322,7 +322,13 @@ export function Capsule({
     const fromWidth = inFlight ? element.offsetWidth : fromRef?.width;
     const fromHeight = inFlight ? element.offsetHeight : fromRef?.height;
     const fromPadding = inFlight ? readPadding(element) : fromPadRef;
-    const fromX = inFlight ? gsap.getProperty(element, "x") : 0;
+    // For collapse, the FROM position is the current centered x (not 0).
+    // Read the actual transform; fallback to 0 only when expanding from collapsed.
+    const fromX = isExpanded
+      ? 0
+      : inFlight
+        ? gsap.getProperty(element, "x")
+        : gsap.getProperty(element, "x");
 
     gsap.killTweensOf(element);
     // Unpin (no-op on a resting element) to read the true natural size of the
