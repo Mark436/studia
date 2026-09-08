@@ -79,6 +79,21 @@ Expandido (`stacked`):
   `glass-panel-bare`: mismo glass, sin el anillo de 1 px. Solo «En clase»
   conserva el borde acento (`glass-panel-accent`).
 
+### Fase 6 — Morf sin saltos de altura
+
+- El salto al final del morf venía del `transition-[padding,opacity]`
+  declarado en la clase: al medir el destino, la transición recién empezada
+  reporta el padding de la posición de salida, el tween queda corto y la caja
+  "pega" al final. Ahora el morf desactiva la transición inline (la restaura
+  como `""` al terminar, para que la clase siga mandando), mide con el layout
+  objetivo y anima `paddingTop/Right/Bottom/Left` con GSAP en sincronía con
+  `width`/`height`.
+- El pop del flash también desactiva la transición durante su tween: el blink
+  de opacidad es por-frame y el `transition-[opacity]` de la clase lo doblaría.
+- El flash, al limpiarse (vida útil de 10 s), **vuelve** al tamaño del pill del
+  horario con un settle suave (`CAPSULE_COLLAPSE_DURATION/EASE`, sin blink) en
+  vez de cambiar de contenido con un salto.
+
 ## 5. Estados de la cápsula — inventario (plegado / desplegado)
 
 Fuente de render: `features/schedule/components/ScheduleCapsule.tsx`. Estados
@@ -171,13 +186,16 @@ variante tipográfica grande, sin repetir `mañana`/día abajo (ya fecha el
 plegado; se eliminó la línea de referencia al día que duplicaba el dato).
 - Ancla (`minimizedExpanded`): mensaje del plegado grande `font-display
   text-capsule-title font-bold`: `Mañana HH:MM` / `Nos vemos el {día}`.
-- Bloque desplegado (`expanded`): materia resumida (`shortenSubjectName`) con
-  su hora (`text-capsule-body`, materia en `font-semibold text-on-surface`,
-  hora `tabular-nums`), todo `truncate`.
+- Bloque desplegado (`expanded`): materia (`subjectName` completa) y salón
+  (`formatClassroomLabel`), `text-capsule-body`, materia en `font-semibold
+  text-on-surface`, salón `text-on-surface-variant`, separados por " · ", todo
+  `truncate`. **Sin la hora**: ya está en el plegado y en el ancla.
 - Sin clases en la semana → solo el mensaje `Consulta otro día desde tu
   horario.` (sin bloque extra al desplegar).
 - CAMBIOS HECHOS (ajustable): migrado a `stacked`; ancla grande del mensaje
-  del plegado; sin la referencia al día duplicada; materia + hora abajo.
+  del plegado; sin la referencia al día duplicada; materia + salón abajo (sin
+  hora, que ya vive en el plegado/ancla); la lógica de "ancla = plegado en
+  grande, bloque = solo dato nuevo" se mantiene en todas las cápsulas.
 
 ### 5.5 Flash de evento académico — tono neutro, `stacked`
 

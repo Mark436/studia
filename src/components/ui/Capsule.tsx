@@ -67,6 +67,38 @@ const EXPANDED_RADIUS_PX = 20;
 const RING_STROKE_PX = 2;
 const RING_INSET_PX = 1;
 
+/** Per-side padding of the capsule box (px). */
+interface CapsulePadding {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+function readPadding(element: HTMLElement): CapsulePadding {
+  const computed = getComputedStyle(element);
+  return {
+    top: parseFloat(computed.paddingTop) || 0,
+    right: parseFloat(computed.paddingRight) || 0,
+    bottom: parseFloat(computed.paddingBottom) || 0,
+    left: parseFloat(computed.paddingLeft) || 0,
+  };
+}
+
+function applyPadding(element: HTMLElement, padding: CapsulePadding): void {
+  element.style.paddingTop = `${padding.top}px`;
+  element.style.paddingRight = `${padding.right}px`;
+  element.style.paddingBottom = `${padding.bottom}px`;
+  element.style.paddingLeft = `${padding.left}px`;
+}
+
+function clearPadding(element: HTMLElement): void {
+  element.style.paddingTop = "";
+  element.style.paddingRight = "";
+  element.style.paddingBottom = "";
+  element.style.paddingLeft = "";
+}
+
 /**
  * Two half-perimeter arc paths for the progress ring. Both start at the
  * middle of the left edge and grow outward: the top arc travels up → right →
@@ -143,6 +175,11 @@ export function Capsule({
   const expandedSizeRef = useRef<{ width: number; height: number } | null>(
     null,
   );
+  // Same bookkeeping for per-side padding, tweened in sync with the box so
+  // the interior doesn't lag the outer size (the CSS padding transition would
+  // animate on its own 300 ms clock and make the height "jump" at the end).
+  const collapsedPadRef = useRef<CapsulePadding | null>(null);
+  const expandedPadRef = useRef<CapsulePadding | null>(null);
   const prevExpandedRef = useRef(isExpanded);
   const morphingRef = useRef(false);
   const reducedMotion = usePrefersReducedMotion();
@@ -257,11 +294,13 @@ export function Capsule({
             width: element.offsetWidth,
             height: element.offsetHeight,
           };
+          expandedPadRef.current = readPadding(element);
         } else {
           collapsedSizeRef.current = {
             width: element.offsetWidth,
             height: element.offsetHeight,
           };
+          collapsedPadRef.current = readPadding(element);
         }
       }
       return;
@@ -270,11 +309,15 @@ export function Capsule({
     const fromRef = isExpanded
       ? collapsedSizeRef.current
       : expandedSizeRef.current;
+    const fromPadRef = isExpanded
+      ? collapsedPadRef.current
+      : expandedPadRef.current;
     // If a morph is in flight the box is pinned to the animated size; snap up
     // from there instead of from a rest state (rare mid-tween re-toggle).
     const inFlight = gsap.getTweensOf(element).length > 0;
     const fromWidth = inFlight ? element.offsetWidth : fromRef?.width;
     const fromHeight = inFlight ? element.offsetHeight : fromRef?.height;
+    const fromPadding = inFlight ? readPadding(element) : fromPadRef;
     const fromX = inFlight ? gsap.getProperty(element, "x") : 0;
 
     gsap.killTweensOf(element);
@@ -284,14 +327,28 @@ export function Capsule({
     element.style.height = "";
     element.style.minWidth = "";
     gsap.set(element, { x: 0, scale: 1, opacity: 1 });
+    // The class carries `transition-[padding,opacity]`: while it is active a
+    // freshly-started transition reports its START value, so a measurement
+    // would read padding from the wrong state and the tween would land short
+    // (the classic "height jumps" at the end). Disable it for the measurement
+    // and the whole tween; padding is animated by GSAP below and the class
+    // transition is restored (inline "") once the morph completes.
+    element.style.transition = "none";
+    void element.offsetWidth; // flush a layout read with the target classes
     const targetWidth = element.offsetWidth;
     const targetHeight = element.offsetHeight;
-    if (targetWidth <= 0 || targetHeight <= 0) return;
+    const targetPadding = readPadding(element);
+    if (targetWidth <= 0 || targetHeight <= 0) {
+      element.style.transition = "";
+      return;
+    }
 
     if (isExpanded) {
       expandedSizeRef.current = { width: targetWidth, height: targetHeight };
+      expandedPadRef.current = targetPadding;
     } else {
       collapsedSizeRef.current = { width: targetWidth, height: targetHeight };
+      collapsedPadRef.current = targetPadding;
     }
 
     const targetX = isExpanded
@@ -308,11 +365,16 @@ export function Capsule({
         minWidth: 0,
         x: Number(fromX),
       });
+      if (fromPadding !== null) applyPadding(element, fromPadding);
     }
     gsap.to(element, {
       width: targetWidth,
       height: targetHeight,
       x: targetX,
+      paddingTop: targetPadding.top,
+      paddingRight: targetPadding.right,
+      paddingBottom: targetPadding.bottom,
+      paddingLeft: targetPadding.left,
       duration: isExpanded
         ? CAPSULE_MORPH_DURATION
         : CAPSULE_COLLAPSE_DURATION,
@@ -322,6 +384,8 @@ export function Capsule({
         element.style.width = "";
         element.style.height = "";
         element.style.minWidth = "";
+        clearPadding(element);
+        element.style.transition = "";
         morphingRef.current = false;
       },
     });
@@ -330,10 +394,12 @@ export function Capsule({
   // Transient pop while collapsed: a swapped-in flash is announced with a
   // bouncy size/scale spring toward its new natural size plus a quick double
   // blink, so an event reads as "something happened" without the card opening
-  // on its own. Skips when the capsule is mid-morph or already expanded.
+  // on its own. When the flash leaves (notification cleared), the same tween
+  // settles back to the schedule pill's natural size so the return doesn't
+  // hop. Skips when the capsule is mid-morph or already expanded.
   useLayoutEffect(() => {
-    if (popKey === undefined || popKey === "") return;
-    if (previousPopKeyRef.current === popKey) return;
+    if (popKey === previousPopKeyRef.current) return;
+    const departed = popKey === undefined || popKey === "";
     previousPopKeyRef.current = popKey;
 
     const element = elementRef.current;
@@ -343,14 +409,20 @@ export function Capsule({
 
     gsap.killTweensOf(element);
     popTimelineRef.current?.kill();
-    // Unpin to read the true natural size of the committed flash content.
+    // The class carries `transition-[padding,opacity]`; the blink below moves
+    // opacity by the frame, so the CSS transition must not double-ease it.
+    element.style.transition = "none";
+    // Unpin to read the true natural size of the committed content.
     element.style.width = "";
     element.style.height = "";
     element.style.minWidth = "";
     gsap.set(element, { x: 0, scale: 1, opacity: 1 });
     const targetWidth = element.offsetWidth;
     const targetHeight = element.offsetHeight;
-    if (targetWidth <= 0 || targetHeight <= 0) return;
+    if (targetWidth <= 0 || targetHeight <= 0) {
+      element.style.transition = "";
+      return;
+    }
 
     morphingRef.current = true;
     if (fromSize !== null) {
@@ -358,7 +430,7 @@ export function Capsule({
         width: fromSize.width,
         height: fromSize.height,
         minWidth: 0,
-        scale: 0.96,
+        scale: departed ? 1 : 0.96,
         opacity: 1,
       });
     }
@@ -369,34 +441,55 @@ export function Capsule({
         element.style.height = "";
         element.style.minWidth = "";
         gsap.set(element, { scale: 1, opacity: 1 });
+        element.style.transition = "";
         morphingRef.current = false;
         collapsedSizeRef.current = { width: targetWidth, height: targetHeight };
       },
     });
     popTimelineRef.current = timeline;
 
-    timeline
-      .to(
+    // Flash leaving: a quiet settle back to the schedule pill size — no blink.
+    if (departed) {
+      timeline.to(
         element,
         {
           width: targetWidth,
           height: targetHeight,
           scale: 1,
-          duration: CAPSULE_FLASH_DURATION,
-          ease: CAPSULE_FLASH_EASE,
+          duration: CAPSULE_COLLAPSE_DURATION,
+          ease: CAPSULE_COLLAPSE_EASE,
           overwrite: "auto",
         },
         0,
-      )
-      // Double blink right where the event lands.
-      .fromTo(
-        element,
-        { opacity: 0.35 },
-        { opacity: 1, duration: 0.09, ease: "power1.out" },
-        0,
-      )
-      .to(element, { opacity: 0.65, duration: 0.05, ease: "power1.in" }, 0.12)
-      .to(element, { opacity: 1, duration: 0.06, ease: "power1.out" }, 0.17);
+      );
+    } else {
+      // Arrival: bouncy pop plus a double blink right where the event lands.
+      timeline
+        .to(
+          element,
+          {
+            width: targetWidth,
+            height: targetHeight,
+            scale: 1,
+            duration: CAPSULE_FLASH_DURATION,
+            ease: CAPSULE_FLASH_EASE,
+            overwrite: "auto",
+          },
+          0,
+        )
+        .fromTo(
+          element,
+          { opacity: 0.35 },
+          { opacity: 1, duration: 0.09, ease: "power1.out" },
+          0,
+        )
+        .to(
+          element,
+          { opacity: 0.65, duration: 0.05, ease: "power1.in" },
+          0.12,
+        )
+        .to(element, { opacity: 1, duration: 0.06, ease: "power1.out" }, 0.17);
+    }
   }, [popKey, isExpanded, reducedMotion]);
 
   useEffect(

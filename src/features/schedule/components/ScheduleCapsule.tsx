@@ -204,7 +204,8 @@ export function ScheduleCapsule({
     const tomorrowWeekday = (now.getDay() + 1) % 7;
     const isTomorrow = info !== null && info.weekday === tomorrowWeekday;
     const dayName = info !== null ? WEEKDAY_NAMES[info.weekday] : null;
-    const subjectLabel = info ? shortenSubjectName(info.subjectName) : undefined;
+    const classroomLabel =
+      info !== null ? formatClassroomLabel(info.classroom) : null;
     const headline =
       info === null
         ? "Consulta otro día desde tu horario."
@@ -246,9 +247,15 @@ export function ScheduleCapsule({
         expanded={
           info === null ? null : (
             <span className="truncate text-capsule-body text-on-surface-variant">
-              <span className="font-semibold text-on-surface">{subjectLabel}</span>
-              {" · "}
-              <span className="tabular-nums">{info.startsLabel}</span>
+              <span className="font-semibold text-on-surface">
+                {info.subjectName}
+              </span>
+              {classroomLabel !== null ? (
+                <>
+                  {" · "}
+                  <span>{classroomLabel}</span>
+                </>
+              ) : null}
             </span>
           )
         }
