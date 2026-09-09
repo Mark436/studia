@@ -119,8 +119,9 @@ El contador jerarquiza por tamaño (no por peso): la hora va grande y
 "m" más chiquita aún. El salón se muestra crudo ("LB-24"), sin prefijo, en su
 misma línea a la derecha de los números y en `font-medium`: el blanco sobre el
 glass ya lo hace resaltar. La materia debajo usa un nombre resumido al plano
-colapsado (`shortenSubjectName`, umbral 24 caracteres, ~2 palabras) que nunca
-envuelve; al expandir se revela el nombre **completo**.
+colapsado (`shortenSubjectName`, umbral 12 caracteres) que nunca envuelve; al
+expandir el nombre **completo** se revela en una sola línea sin salto
+(`overflow-hidden`): se va acompletando conforme la cápsula crece.
 
 ### Expandido de clase (estado "En clase")
 
