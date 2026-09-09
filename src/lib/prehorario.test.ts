@@ -8,7 +8,6 @@ import {
   esProgramacion,
   extraerAnio,
   extraerNombreArchivo,
-  interpretarFuenteCalendario,
   parseFechaModificacion,
   urlDocumento,
   urlPrehorario,
@@ -376,32 +375,6 @@ describe("esCalendario / elegirCalendario", () => {
       { archivo: "CALENDARIO_ESCOLAR_2027-1.pdf", modificado: null },
     ]);
     expect(elegido?.archivo).toBe("CALENDARIO_ESCOLAR_2027-1.pdf");
-  });
-});
-
-describe("interpretarFuenteCalendario", () => {
-  test("ruta relativa como la deja calendario-escolar.html", () => {
-    const oficial = interpretarFuenteCalendario(
-      "documentos/CALENDARIO_ESCOLAR_2026-2 v2.pdf",
-    );
-    expect(oficial?.archivo).toBe("CALENDARIO_ESCOLAR_2026-2 v2.pdf");
-    expect(oficial?.url).toBe(
-      "https://ith.mx/documentos/CALENDARIO_ESCOLAR_2026-2%20v2.pdf",
-    );
-  });
-
-  test("ruta absoluta del mismo sitio", () => {
-    const oficial = interpretarFuenteCalendario(
-      "https://ith.mx/documentos/CALENDARIO_ESCOLAR_2026-2_v1.pdf",
-    );
-    expect(oficial?.archivo).toBe("CALENDARIO_ESCOLAR_2026-2_v1.pdf");
-  });
-
-  test("rechaza fuentes fuera del sitio o sin .pdf", () => {
-    expect(
-      interpretarFuenteCalendario("https://otro-sitio.mx/toys/a.pdf"),
-    ).toBeNull();
-    expect(interpretarFuenteCalendario("documentos/NOTAS_SESION.md")).toBeNull();
   });
 });
 

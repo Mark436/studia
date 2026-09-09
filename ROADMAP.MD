@@ -449,11 +449,15 @@ antes de la inscripción.
   uno distinto al procesado lo aplica **silenciosamente** (sin toast). Sin
   ventanas anuales: la cadencia la controla el chequeo, no una ventana de días
   sobre el archivo.
-- [x] La página oficial `ith.mx/calendario-escolar.html`
-  (`obtenerCalendarioOficial`) se conserva como fuente alternativa del harness
-  de devtools, no para la detección del ciclo.
-- [x] Prueba de **calendario**: extrae el PDF de la página oficial
-  (`obtenerCalendarioOficial`) y lee sus fechas de inicio de labores con pdfjs.
+- [x] La página oficial `ith.mx/calendario-escolar.html` y sus lectores
+  (`obtenerCalendarioOficial`, `parseCalendarioOficial`,
+  `interpretarFuenteCalendario`) se **eliminaron** (2026-09-08): el listado es
+  la única fuente del calendario.
+- [x] Prueba de **calendario** en el harness del pipeline
+  (`PruebaCompletaSection`): el paso 1 consulta el listado con
+  `obtenerPrehorarios()` + `elegirCalendario()` (mismo mecanismo del chequeo
+  diario) y el paso 2 lee las fechas del PDF con pdfjs (inicio de labores,
+  actividad 5 y fin de clases).
 - [x] **Desempate por tokens distintivos**: se descartan los genéricos
   (INGENIERIA, LICENCIATURA, EN, E, DE, DEL, LA, EL, UN, UNA, AL), los nombres
   sin espacio se parten por el punto (`ING.INFORMATICA` → ING + INFORMATICA) y

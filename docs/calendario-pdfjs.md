@@ -9,9 +9,10 @@ Sirven para recordar el razonamiento sin re-descubrirlo.
 > La búsqueda del calendario del **ciclo siguiente vuelve al listado**
 > (`elegirCalendario`, primer `*calendario*` en `documentos/?C=M;O=D` sin
 > ventana de días), pero limitada a la **ventana vacacional** (fin de clases →
-> inicio de labores), con cadencia de 7 días y aplicación **silenciosa**. La
-> página oficial se conserva solo como fuente del harness de devtools. Detalle
-> del ciclo completo: `docs/sugerir-horario.md` §1/§4.
+> inicio de labores), con cadencia de 7 días y aplicación **silenciosa**. El
+> flujo por la página oficial se **eliminó por completo** (ya no hay
+> `obtenerCalendarioOficial` ni harness que la consulte). Detalle del ciclo
+> completo: `docs/sugerir-horario.md` §1/§4.
 
 ---
 
@@ -54,13 +55,14 @@ la página oficial.
   - **2026-09-08:** `elegirCalendario` y `esCalendario` vuelven
     (`lib/prehorario.ts`), para la detección del calendario del ciclo siguiente
     por listado durante las vacaciones.
-  - `obtenerCalendarioOficial()` / `parseCalendarioOficial()` se conservan como
-    fuente alternativa del harness de devtools, no para la detección.
+  - **2026-09-08:** se **eliminaron** `obtenerCalendarioOficial()`,
+    `parseCalendarioOficial()` e `interpretarFuenteCalendario()` (ya no se usa
+    la página oficial).
   - El prehorario sigue usando el listado (`elegirPrehorarioCarrera`): ahí no
     hay una página oficial dedicada, el listado es la fuente correcta.
-- `src/features/devtools/components/PrehorarioTestSection.tsx`
-  - «Probar calendario» consulta la página oficial y lee las fechas de «inicio
-    de labores» del PDF.
+- `src/features/devtools/components/PruebaCompletaSection.tsx`
+  - El paso 1 del pipeline («Calendario (listado)») usa `obtenerPrehorarios()` +
+    `elegirCalendario()`, el mismo mecanismo del chequeo diario.
 - `src/lib/prehorario.test.ts` — test de `esCalendario` / `elegirCalendario`
   (re-incorporados 2026-09-08).
 - `ROADMAP.MD` §17 — la detección del calendario vuelve al listado (vacaciones).
@@ -158,11 +160,9 @@ del PDF.
 
 ## Referencias
 
-- Página oficial del calendario: https://ith.mx/calendario-escolar.html
 - Listado de documentos: https://ith.mx/documentos/?C=M;O=D (calendario del
   ciclo siguiente y prehorario de la carrera)
 - `src/lib/calendarioLabores.ts` — lectura del PDF, worker e interpretación de
   fechas (labores, actividad 5, fin de clases).
-- `src/lib/prehorario.ts` — `elegirCalendario()` (detección por listado) y
-  `obtenerCalendarioOficial()` (harness devtools); prehorario vía
-  `obtenerPrehorarios()`.
+- `src/lib/prehorario.ts` — `elegirCalendario()` (detección por listado),
+  prehorario vía `obtenerPrehorarios()`.

@@ -18,14 +18,6 @@ export interface ResultadoPrehorarios {
 // URL para fetch (proxy en producción, proxy de Vite en dev).
 const FETCH_URL = "/api/ith/documentos/?C=M;O=D";
 
-// URL base real del sitio ITH para resolver rutas relativas en el HTML devuelto.
-const SITIO_ITH = "https://ith.mx/";
-
-// El webmaster del ITH publica el calendario oficial vigente incrustado en
-// esta página (`<embed src>` y/o `<ul class="doc"><a href>`).
-const CALENDARIO_OFICIAL_URL = "/api/ith/calendario-escolar.html";
-const CALENDARIO_DIRECT_URL = "https://ith.mx/calendario-escolar.html";
-
 export function extraerAnio(archivo: string): number | null {
   const match = archivo.match(/20\d{2}/);
 
@@ -34,69 +26,6 @@ export function extraerAnio(archivo: string): number | null {
 
 export function esPrehorario(archivo: string): boolean {
   return /prehorario/i.test(archivo);
-}
-
-export interface CalendarioOficial {
-  archivo: string;
-  url: string;
-}
-
-/**
- * Convierte la ruta que apunta la página `calendario-escolar.html` (relativa
- * tipo "documentos/CALENDARIO…pdf" o absoluta) en el archivo + URL canónica.
- * Fuera de `https://ith.mx` o sin extensión `.pdf` no se acepta.
- */
-export function interpretarFuenteCalendario(
-  fuente: string,
-): CalendarioOficial | null {
-  const archivo = extraerNombreArchivo(fuente, SITIO_ITH);
-  if (!archivo || !/\.pdf$/i.test(archivo)) return null;
-
-  const url = new URL(fuente, SITIO_ITH);
-  if (url.origin !== new URL(SITIO_ITH).origin) return null;
-
-  return { archivo, url: url.href };
-}
-
-/**
- * La página embebe a veces varios calendarios (uno por periodo). Se escoge el
- * vigente: el que tiene el año más alto en el nombre (desempate: primero en la
- * página).
- */
-export function parseCalendarioOficial(html: string): CalendarioOficial | null {
-  const dom = new DOMParser().parseFromString(html, "text/html");
-  const Fuentes = [
-    ...dom.querySelectorAll<HTMLEmbedElement>("embed[src$='.pdf']"),
-    ...dom.querySelectorAll<HTMLAnchorElement>("ul.doc a[href$='.pdf']"),
-    ...dom.querySelectorAll<HTMLAnchorElement>("a[href$='.pdf']"),
-  ]
-    .map(element =>
-      element instanceof HTMLAnchorElement
-        ? element.getAttribute("href")
-        : element.getAttribute("src"),
-    )
-    .filter((fuente): fuente is string => Boolean(fuente));
-
-  let mejor: { oficial: CalendarioOficial; anio: number } | null = null;
-  for (const fuente of Fuentes) {
-    const oficial = interpretarFuenteCalendario(fuente);
-    if (!oficial) continue;
-    const anio = extraerAnio(oficial.archivo) ?? -1;
-    if (!mejor || anio > mejor.anio) {
-      mejor = { oficial, anio };
-    }
-  }
-
-return mejor?.oficial ?? null;
-}
-
-export async function obtenerCalendarioOficial(
-  direct = false,
-): Promise<CalendarioOficial | null> {
-  const url = direct ? CALENDARIO_DIRECT_URL : CALENDARIO_OFICIAL_URL;
-  const response = await fetch(url);
-
-  return response.ok ? parseCalendarioOficial(await response.text()) : null;
 }
 
 export function urlDocumento(archivo: string): string {

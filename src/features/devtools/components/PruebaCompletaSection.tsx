@@ -5,10 +5,11 @@ import type { Alumno } from "@/lib/api/client";
 import { getMateriasDisponibles } from "@/features/student/reticulaPendiente";
 import { calcularSugerenciaHorario } from "@/lib/sugerirHorario";
 import {
-  obtenerCalendarioOficial,
+  elegirCalendario,
   obtenerPrehorarios,
   elegirPrehorarioCarrera,
 } from "@/lib/prehorario";
+import type { ResultadoPrehorarios } from "@/lib/prehorario";
 import { leerFechasInicioLabores } from "@/lib/calendarioLabores";
 import { leerRenglonesPDF, urlDocumentoPdf } from "@/lib/pdfTexto";
 import { procesarPrehorarioTexto } from "@/lib/prehorarioTablas";
@@ -23,8 +24,13 @@ interface PasoResultado<T = unknown> {
 }
 
 interface PruebaCompletaState {
-  calendarioOficial: PasoResultado<{ archivo: string; url: string }>;
-  fechasCalendario: PasoResultado<{ inicioLabores: Date[]; publicacionPrehorarios: Date[]; texto: string }>;
+  calendario: PasoResultado<{ archivo: string; url: string }>;
+  fechasCalendario: PasoResultado<{
+    inicioLabores: Date[];
+    publicacionPrehorarios: Date[];
+    finDeClases: Date | null;
+    texto: string;
+  }>;
   prehorariosListing: PasoResultado<{ anioActual: number | null; prehorarios: string[]; programaciones: string[] }>;
   prehorarioCarrera: PasoResultado<{ archivo: string | null; puntaje: number; candidatos: Array<{ archivo: string; puntaje: number; esPrehorario: boolean }> }>;
   prehorarioPDF: PasoResultado<{ semestres: number; materias: number; grupos: number }>;
@@ -36,7 +42,7 @@ interface PruebaCompletaState {
 }
 
 const PASOS_INICIALES: PruebaCompletaState = {
-  calendarioOficial: { estado: "idle", datos: null, error: null, duracionMs: 0 },
+  calendario: { estado: "idle", datos: null, error: null, duracionMs: 0 },
   fechasCalendario: { estado: "idle", datos: null, error: null, duracionMs: 0 },
   prehorariosListing: { estado: "idle", datos: null, error: null, duracionMs: 0 },
   prehorarioCarrera: { estado: "idle", datos: null, error: null, duracionMs: 0 },
@@ -71,38 +77,44 @@ export function PruebaCompletaSection({
     setCorriendo(true);
     setState(PASOS_INICIALES);
 
-    // PASO 1: Calendario oficial
-    actualizarPaso("calendarioOficial", { estado: "running" });
+    // PASO 1: Calendario en el listado (mismo mecanismo del chequeo diario)
+    actualizarPaso("calendario", { estado: "running" });
     const t1 = performance.now();
+    let listing: ResultadoPrehorarios;
     try {
-      const oficial = await obtenerCalendarioOficial();
-      actualizarPaso("calendarioOficial", {
-        estado: oficial ? "success" : "error",
-        datos: oficial ?? null,
-        error: oficial ? null : "No se pudo obtener el calendario oficial",
+      listing = await obtenerPrehorarios();
+      const elegido = elegirCalendario(listing.todos ?? []);
+      actualizarPaso("calendario", {
+        estado: elegido ? "success" : "error",
+        datos: elegido
+          ? { archivo: elegido.archivo, url: urlDocumentoPdf(elegido.archivo) }
+          : null,
+        error: elegido
+          ? null
+          : "No se encontró archivo `*calendario*` en el listado",
         duracionMs: performance.now() - t1,
       });
 
-      if (!oficial) throw new Error("Sin calendario oficial");
+      if (!elegido) throw new Error("Sin calendario en el listado");
 
       // PASO 2: Fechas del calendario (PDF)
       actualizarPaso("fechasCalendario", { estado: "running" });
       const t2 = performance.now();
-      const lectura = await leerFechasInicioLabores(urlDocumentoPdf(oficial.archivo));
+      const lectura = await leerFechasInicioLabores(urlDocumentoPdf(elegido.archivo));
       actualizarPaso("fechasCalendario", {
         estado: "success",
         datos: {
           inicioLabores: lectura.fechas,
           publicacionPrehorarios: lectura.publicacionPrehorarios,
+          finDeClases: lectura.finDeClases,
           texto: lectura.texto.substring(0, 500) + (lectura.texto.length > 500 ? "…" : ""),
         },
         duracionMs: performance.now() - t2,
       });
 
-      // PASO 3: Listado de prehorarios
-      actualizarPaso("prehorariosListing", { estado: "running" });
+      // PASO 3: Listado de prehorarios (el mismo fetch del paso 1)
+      actualizarPaso("prehorariosListing", { estado: "success" });
       const t3 = performance.now();
-      const listing = await obtenerPrehorarios();
       actualizarPaso("prehorariosListing", {
         estado: "success",
         datos: {
@@ -116,24 +128,24 @@ export function PruebaCompletaSection({
       // PASO 4: Elegir prehorario de la carrera
       actualizarPaso("prehorarioCarrera", { estado: "running" });
       const t4 = performance.now();
-      const elegido = elegirPrehorarioCarrera(listing, alumno.carrera);
+      const elegidoCarrera = elegirPrehorarioCarrera(listing, alumno.carrera);
       actualizarPaso("prehorarioCarrera", {
-        estado: elegido.archivo ? "success" : "error",
+        estado: elegidoCarrera.archivo ? "success" : "error",
         datos: {
-          archivo: elegido.archivo,
-          puntaje: elegido.puntaje,
-          candidatos: elegido.candidatos.filter((c) => c.puntaje > 0).slice(0, 10),
+          archivo: elegidoCarrera.archivo,
+          puntaje: elegidoCarrera.puntaje,
+          candidatos: elegidoCarrera.candidatos.filter((c) => c.puntaje > 0).slice(0, 10),
         },
-        error: elegido.archivo ? null : "No se encontró prehorario para esta carrera",
+        error: elegidoCarrera.archivo ? null : "No se encontró prehorario para esta carrera",
         duracionMs: performance.now() - t4,
       });
 
-      if (!elegido.archivo) throw new Error("Sin prehorario de la carrera");
+      if (!elegidoCarrera.archivo) throw new Error("Sin prehorario de la carrera");
 
       // PASO 5: Leer y parsear PDF del prehorario
       actualizarPaso("prehorarioPDF", { estado: "running" });
       const t5 = performance.now();
-      const paginas = await leerRenglonesPDF(urlDocumentoPdf(elegido.archivo));
+      const paginas = await leerRenglonesPDF(urlDocumentoPdf(elegidoCarrera.archivo));
       const prehorarioJson = procesarPrehorarioTexto(paginas);
       const semestres = Object.keys(prehorarioJson).length;
       const materias = Object.values(prehorarioJson).reduce((acc, s) => acc + s.materias.length, 0);
@@ -185,20 +197,23 @@ export function PruebaCompletaSection({
     }
   }
 
-  async function reintentarCalendarioSinProxy() {
+  async function reintentoCalendarioPorListado() {
     setCorriendo(true);
-    actualizarPaso("calendarioOficial", { estado: "running", error: null });
+    actualizarPaso("calendario", { estado: "running", error: null });
     const t1 = performance.now();
     try {
-      const oficial = await obtenerCalendarioOficial(true);
-      actualizarPaso("calendarioOficial", {
-        estado: oficial ? "success" : "error",
-        datos: oficial ?? null,
-        error: oficial ? null : "No se pudo obtener el calendario oficial",
+      const listing = await obtenerPrehorarios();
+      const elegido = elegirCalendario(listing.todos ?? []);
+      actualizarPaso("calendario", {
+        estado: elegido ? "success" : "error",
+        datos: elegido
+          ? { archivo: elegido.archivo, url: urlDocumentoPdf(elegido.archivo) }
+          : null,
+        error: elegido ? null : "No se encontró archivo `*calendario*` en el listado",
         duracionMs: performance.now() - t1,
       });
     } catch (error) {
-      actualizarPaso("calendarioOficial", {
+      actualizarPaso("calendario", {
         estado: "error",
         error: error instanceof Error ? error.message : "Error desconocido",
         duracionMs: performance.now() - t1,
@@ -264,7 +279,7 @@ export function PruebaCompletaSection({
     <section className="flex flex-col gap-3">
       <h4 className="text-sm font-semibold text-on-surface">Prueba completa del pipeline</h4>
       <p className="text-xs text-on-surface-variant">
-        Ejecuta: calendario oficial → fechas PDF → listado prehorarios → carrera → PDF prehorario → sugerencia horario
+        Ejecuta: calendario (listado) → fechas PDF → listado prehorarios → carrera → PDF prehorario → sugerencia horario
       </p>
       <Button
         variant={corriendo ? "secondary" : "primary"}
@@ -277,17 +292,17 @@ export function PruebaCompletaSection({
 
       <Card className="flex flex-col gap-4 text-xs">
         {renderPaso(
-          "1. Calendario oficial",
-          state.calendarioOficial,
+          "1. Calendario (listado)",
+          state.calendario,
           (d) => `Archivo: ${d.archivo}\nURL: ${d.url}`,
-          state.calendarioOficial.estado === "error" ? (
+          state.calendario.estado === "error" ? (
             <Button
               variant="secondary"
-              onClick={reintentarCalendarioSinProxy}
+              onClick={reintentoCalendarioPorListado}
               disabled={corriendo}
               className="ml-5 w-fit"
             >
-              Reintentar sin proxy
+              Reintentar consulta del listado
             </Button>
           ) : undefined,
         )}
@@ -296,6 +311,7 @@ export function PruebaCompletaSection({
           state.fechasCalendario,
           (d) =>
             `Inicio labores: ${d.inicioLabores.map((f) => f.toISOString().split("T")[0]).join(", ") || "—"}\n` +
+            `Fin de clases: ${d.finDeClases ? d.finDeClases.toISOString().split("T")[0] : "—"}\n` +
             `Publicación prehorarios (act. 5): ${d.publicacionPrehorarios.map((f) => f.toISOString().split("T")[0]).join(", ") || "—"}`,
         )}
         {renderPaso(
