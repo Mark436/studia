@@ -53,21 +53,20 @@ function anioDelPeriodo(texto: string): number | null {
 }
 
 /**
- * Interpreta la celda que sigue a «Inicio de labores» y devuelve su fecha.
+ * Interpreta una celda como «<día> <mes> [<año>]» y devuelve su fecha.
+ * Identifica el mes por palabra; sin mes usa enero del año base.
  *
- * Formatos reales observados:
- *   «Inicio de Labores  03 agosto»
- *   «Inicio de labores  6 de enero 2026»   (el PDF escribe «202 6» y año de
- *    un dígito corrido; y para enero el instituto pone el año del periodo,
- *    aunque esa fecha pertenezca al ciclo siguiente).
- *   «Inicio de labores  03 ago»
- *
- * Regla del año: el ciclo académico inicia en agosto (mes >= 7). Los labores
- * de un mes anterior a agosto pertenecen al ciclo siguiente, así que si el mes
- * detectado es < 7 se suma un año al base (explícito, o el año del periodo, o
- * el año actual).
+ * Regla del año: el ciclo académico inicia en agosto (mes >= 7). El «inicio de
+ * labores» de un mes anterior a agosto pertenece al ciclo siguiente, así que
+ * con `saltarCicloSiguiente` se suma un año al base (explícito, o el año del
+ * periodo, o el año actual). El «fin de clases» NO se mueve: pertenece al
+ * periodo del propio calendario.
  */
-function interpretarFechaInicio(ventana: string, periodoAnio: number | null): Date | null {
+function interpretarFecha(
+  ventana: string,
+  periodoAnio: number | null,
+  saltarCicloSiguiente: boolean,
+): Date | null {
   const diaMatch = /\b(\d{1,2})\b/.exec(ventana);
   if (!diaMatch) return null;
 
@@ -77,11 +76,16 @@ function interpretarFechaInicio(ventana: string, periodoAnio: number | null): Da
   const mes = indiceMes(ventana);
   const anioExplicito = anioEnTexto(ventana);
   const anioBase = anioExplicito ?? periodoAnio ?? new Date().getFullYear();
-  const anio = mes !== null && mes < 7 ? anioBase + 1 : anioBase;
+  const anio =
+    mes !== null && mes < 7 && saltarCicloSiguiente ? anioBase + 1 : anioBase;
 
   const fecha = new Date(anio, mes ?? 0, dia);
 
   return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
+function interpretarFechaInicio(ventana: string, periodoAnio: number | null): Date | null {
+  return interpretarFecha(ventana, periodoAnio, true);
 }
 
 /**
@@ -157,16 +161,46 @@ export function extraerFechasPublicacionPrehorarios(texto: string): Date[] {
   return fechas;
 }
 
+// La fila «Fin de clases» (licenciatura/posgrado e idiomas) marca el último
+// día de clases del periodo en curso; de ahí parte la búsqueda del calendario
+// siguiente durante las vacaciones. «Fin de cursos de … extraescolares» NO
+// cuenta (los extraescolares terminan antes que las clases).
+const RE_FIN_DE_CLASES = /fin\s+de\s+clases[\s\S]{0,100}/gi;
+
+/**
+ * Lógica pura: extrae el último día de clases del periodo en curso. Si el
+ * PDF trae más de una fila (licenciatura y posgrado / idiomas) se queda con la
+ * más tardía. Año: el del periodo (el fin de clases pertenece al propio
+ * calendario, no se le aplica la regla +1 de «inicio de labores»).
+ */
+export function extraerFinDeClases(texto: string): Date | null {
+  const normalizado = texto.replace(/\s+/g, " ");
+  const periodoAnio = anioDelPeriodo(normalizado);
+  let mejor: Date | null = null;
+
+  let match: RegExpExecArray | null;
+  while ((match = RE_FIN_DE_CLASES.exec(normalizado)) !== null) {
+    const fecha = interpretarFecha(match[0], periodoAnio, false);
+    if (fecha !== null && (mejor === null || fecha.getTime() > mejor.getTime())) {
+      mejor = fecha;
+    }
+  }
+
+  return mejor;
+}
+
 export interface ResultadoLecturaCalendario {
   fechas: Date[];
   publicacionPrehorarios: Date[];
+  /** Último día de clases del periodo en curso (null si el PDF no lo trae). */
+  finDeClases: Date | null;
   texto: string;
 }
 
 /**
  * Descarga el PDF del calendario, extrae su texto con pdf.js y devuelve las
- * fechas de «inicio de labores» y la de publicación de prehorarios (actividad
- * 5) junto con el texto crudo.
+ * fechas de «inicio de labores», la de publicación de prehorarios (actividad
+ * 5), el fin de clases y el texto crudo.
  */
 export async function leerFechasInicioLabores(
   url: string,
@@ -176,6 +210,7 @@ export async function leerFechasInicioLabores(
   return {
     fechas: extraerFechasInicioLabores(texto),
     publicacionPrehorarios: extraerFechasPublicacionPrehorarios(texto),
+    finDeClases: extraerFinDeClases(texto),
     texto,
   };
 }

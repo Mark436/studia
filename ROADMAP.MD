@@ -440,14 +440,20 @@ antes de la inscripción.
 - [x] Fecha de modificación de cada archivo del listado (`parseArchivosConFecha`);
   el botón de prehorario y el nuevo de calendario la validan contra `getNow()`
   (reloj del modo dev) con una ventana de 7 días.
-- [x] **Calendario oficial = fuente única**: la página
-  `ith.mx/calendario-escolar.html` incrusta el PDF vigente (`<embed src>` /
-  `ul.doc a`). `obtenerCalendarioOficial()` lo extrae y es la única fuente para
-  decidir qué calendario usar: no se selecciona escaneando el listado de
-  documentos por nombre `*calendario*` (se retiró `elegirCalendario`).
+- [x] **Detección del calendario por listado en vacaciones** (decisión del
+  dueño, 2026-09-08 — revisa el fallo anterior que retiró `elegirCalendario`):
+  durante las vacaciones de fin de clases (`fechaFinDeClases` →
+  `fechaInicioLabores` del ciclo siguiente) el chequeo consulta el listado
+  `ith.mx/documentos/?C=M;O=D` a lo sumo cada 7 días y elige el primer archivo
+  `*calendario*` (`elegirCalendario` en `src/lib/prehorario.ts`). Al detectar
+  uno distinto al procesado lo aplica **silenciosamente** (sin toast). Sin
+  ventanas anuales: la cadencia la controla el chequeo, no una ventana de días
+  sobre el archivo.
+- [x] La página oficial `ith.mx/calendario-escolar.html`
+  (`obtenerCalendarioOficial`) se conserva como fuente alternativa del harness
+  de devtools, no para la detección del ciclo.
 - [x] Prueba de **calendario**: extrae el PDF de la página oficial
-  (`obtenerCalendarioOficial`) y lee sus fechas de inicio de labores con pdfjs;
-  ya no cruza ni imprime candidatos del listado de documentos.
+  (`obtenerCalendarioOficial`) y lee sus fechas de inicio de labores con pdfjs.
 - [x] **Desempate por tokens distintivos**: se descartan los genéricos
   (INGENIERIA, LICENCIATURA, EN, E, DE, DEL, LA, EL, UN, UNA, AL), los nombres
   sin espacio se parten por el punto (`ING.INFORMATICA` → ING + INFORMATICA) y
@@ -455,12 +461,17 @@ antes de la inscripción.
   AERONÁUTICA» gana su prehorario y no lo roba el de ISC (inflación por
   EN/INGENIERIA).
 - [x] **Máquina de fases del chequeo diario** (`src/lib/busquedaHorarios.ts`,
-  lógica pura): dos **ventanas anuales** (15-dic → calendario ENE-JUN, 15-mayo
-  → calendario AGO-DIC); dentro de la ventana `buscar-calendario` →
-  `procesar-calendario` (extraer fechas del PDF) → `esperar-prehorario` hasta la
-  **fecha de la actividad 5** (fallback labores + 1 día) → `buscar-prehorario`
-  → `completado`; al arrancar una ventana nueva `siguiente-ventana` reinicia el
-  ciclo. **Sin gate de horas**: el estado persiste (IndexedDB) y el avance **no
+  lógica pura): sin ventanas anuales. La búsqueda del calendario del ciclo
+  siguiente corre dentro de la **ventana vacacional** (`fechaFinDeClases` →
+  `fechaInicioLabores`): `procesar-calendario` (aplicar las fechas del PDF
+  nuevo) → `buscar-calendario` (consultar el listado, mínimo 7 días entre
+  consultas) → al salir de vacaciones `esperar-prehorario` hasta la **fecha de
+  la actividad 5** (fallback labores + 1 día) → `buscar-prehorario` →
+  `completado`; `sin-datos` cuando no hay calendario procesado. Un calendario
+  nuevo detectado manda sobre el resto y reinaugura el ciclo. Migración del
+  estado de los ciclos con ventanas: `calendarioVisto` se asume ya procesado y
+  el fin de clases se completa on-demand (`obtenerDatosCalendario`).
+  **Sin gate de horas**: el estado persiste (IndexedDB) y el avance **no
   depende de una sesión actualizada**.
 - [x] **Harness de prueba en modo dev**: sección «Chequeo diario» con botón
   **«Validar fecha (+24h)»** que simula el evento aunque la sesión esté
@@ -472,18 +483,24 @@ antes de la inscripción.
   la de la **actividad 5** (publicación de orden de reinscripción + Prehorarios):
   día en la celda, mes por encabezado de columna, año del periodo. La fase
   `procesar-calendario` guarda ambas (`fechaInicioLabores` /
-  `fechaPublicacionPrehorarios`); la de la actividad 5 dispara `buscar-prehorario`
-  y el aviso de **turnos de reinscripción**.
+  `fechaPublicacionPrehorarios`), más el **fin de clases** del periodo en curso
+  (`extraerFinDeClases`, la fila «Fin de clases» más tardía — sin la regla +1
+  año); el fin de clases delimita la ventana vacacional que dispara la
+  búsqueda del calendario siguiente. La fecha de la actividad 5 dispara
+  `buscar-prehorario` y el aviso de **turnos de reinscripción**.
   - Regla de año de labores: el ciclo inicia en agosto; meses < 8 pertenecen al
     ciclo siguiente (corrige el «6 de enero 2026/2027» del PDF). La actividad 5
     **no** sufre esa regla (siempre está en el primer mes del periodo).
   - `parseCalendarioOficial` elige el **calendario vigente** (mayor año) cuando
     la página embebe varios PDFs.
-- [x] **CORS en producción: decisión tomada** — fetch directo sin relay (el
-  usuario descartó el proxy propio); `ith.mx` no manda `Access-Control-Allow-Origin`,
-  así que en producción el fetch del navegador puede bloquearse; en dev lo
-  resuelve el proxy de vite. Revisitar solo si se confirma que la app vivirá en
-  otro origen.
+- [ ] **Transporte en producción pendiente (diagnóstico 2026-08)**: el proxy de
+  Netlify `netlify/functions/ith-proxy.mts` (único que añadía `Access-Control-Allow-Origin`
+  y reenviaba `Last-Modified` para acceder al calendario/listado desde el
+  navegador) queda en 504 porque **`ith.mx` es inalcanzable desde el datacenter
+  de Netlify** (ETIMEDOUT; sin ruta de red mexicana). La búsqueda por listado en
+  vacaciones solo funcionará donde el fetch llegue (dev/vite o cuando haya
+  ruta). Sin CORS/relay, `ith.mx/calendario-escolar.html` y `documentos/`
+  bloqueados en producción. Revisitar la decisión de transporte.
 
 - [x] **Lectura de PDF separada del calendario**: `leerTextoPDF` /
   `urlDocumentoPdf` viven en `src/lib/pdfTexto.ts` (worker de pdf.js), sin
@@ -535,8 +552,8 @@ antes de la inscripción.
 
 Catálogo central de **eventos, disparadores y cadencias**: [`docs/sugerir-horario.md`](docs/sugerir-horario.md).
 
-- [x] Chequeo diario implementado como fases (15-dic/15-mayo calendario →
-  actividad 5 prehorario → completado) **anclado a las 18:00**, sin gate de
+- [x] Chequeo diario implementado como fases (vacaciones → calendario → labores
+  → actividad 5 prehorario → completado) **anclado a las 18:00**, sin gate de
   horas; estado persistido y testeable desde el modo dev sin esperar fechas.
 - [x] Disparador "diario" en producción: `useHorariosCheck` corre al abrir la
   app, al volver a foreground (`visibilitychange`/`pageshow`/`focus`), al
@@ -546,14 +563,18 @@ Catálogo central de **eventos, disparadores y cadencias**: [`docs/sugerir-horar
 - [x] **Guard de modo offline** en el chequeo diario: sin conexión no se busca
   ni se persiste; el listener `online` vuelve a disparar — ver
   `docs/sugerir-horario.md` §2.
-- [x] Cadencia de re-consulta de la página oficial tras el inicio de labores:
-  decidido **1 vez por día a las 18:00** (sin gate de horas; la fase
-  `buscar-prehorario` se re-evalúa en cada chequeo). El disparo usa la **fecha
-  de la actividad 5**; el fallback `labores + 1 día` solo aplica si el PDF no
-  trae la actividad.
+- [x] Cadencia de la búsqueda del calendario en vacaciones: el listado
+  `documentos/?C=M;O=D` se consulta a lo sumo **cada 7 días**
+  (`diasEntreBusquedasCalendario`, gate `pasoTiempoBusquedaCalendario`) dentro
+  de la ventana vacacional y sin límite de antigüedad sobre el archivo; al
+  salir de vacaciones (inicio de labores) se detiene. En clases, la fase
+  `buscar-prehorario` se re-evalúa cada chequeo con la **fecha de la actividad
+  5**; el fallback `labores + 1 día` solo aplica si el PDF no trae la actividad.
+- [x] **Detección silenciosa**: el calendario nuevo detectado en vacaciones se
+  aplica sin toast; el aviso existe solo para el prehorario de la carrera
+  (1 vez por archivo).
 - [x] **Aviso de turnos de reinscripción**: cuando la fecha de la actividad 5
   es hoy o ya pasó, el bucle de las 18:00 avisa una sola vez
   (`avisoTurnosEnviado`) y el nudge de refrescar lo menciona al sugerir
-  actualizar datos. No existe un archivo «SIG»: el **15 de mayo** es la segunda
-  **ventana del calendario** (ciclo AGO-DIC) y la detección es por cambio del
-  **PDF incrustado** en `ith.mx/calendario-escolar.html`.
+  actualizar datos. No existe un archivo «SIG»: la detección del calendario es
+  por el **primer `*calendario*` del listado** durante las vacaciones.

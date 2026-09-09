@@ -3,22 +3,22 @@ import type { Alumno } from "@/lib/api/client";
 import {
   CONFIG_CHEQUEO_HORARIOS,
   decidirFase,
-  elegirProximaFechaLabores,
   esHoraChequeo,
-  estadoChequeoVacio,
-  inicioVentanaVigente,
+  estadoTrasAplicarCalendario,
   parseEstadoChequeo,
+  pasoTiempoBusquedaCalendario,
   proximoMomentoChequeo,
   serializarEstadoChequeo,
   tocaAvisarTurnosReinscripcion,
 } from "@/lib/busquedaHorarios";
 import type { EstadoChequeoHorarios } from "@/lib/busquedaHorarios";
 import { getNow } from "@/lib/devtools/clock";
+import { obtenerDatosCalendario } from "@/lib/datosCalendario";
 import { leerFechasInicioLabores } from "@/lib/calendarioLabores";
 import { urlDocumentoPdf } from "@/lib/pdfTexto";
 import {
+  elegirCalendario,
   elegirPrehorarioCarrera,
-  obtenerCalendarioOficial,
   obtenerPrehorarios,
 } from "@/lib/prehorario";
 import {
@@ -27,7 +27,6 @@ import {
   SETTING_HORARIOS_CHECKS_STATE,
 } from "@/lib/storage/settingsStore";
 import {
-  CALENDARIO_DISPONIBLE_TOAST,
   PREHORARIO_DISPONIBLE_TOAST,
   TURNOS_REINSCRIPCION_TOAST,
 } from "@/lib/toastMessages";
@@ -55,8 +54,10 @@ async function persistir(estado: EstadoChequeoHorarios): Promise<void> {
  *
  * Anclado a las 18:00 (hora en la que el instituto ya sube los documentos), NO
  * contabiliza si «ya se chequeó»: cada vez que corre (app activa siendo 18:00
- * o después) vuelve a buscar y solo avisa cuando encuentra algo nuevo. Sin
- * conexión no busca ni persiste nada; reactiva al recuperar la red. Usa
+ * o después) vuelve a evaluar y solo actúa cuando toca. Dentro de las
+ * vacaciones de fin de clases se busca el calendario del siguiente ciclo en el
+ * listado, a lo sumo cada 7 días (cadencia `pasoTiempoBusquedaCalendario`).
+ * Sin conexión no busca ni persiste nada; reactiva al recuperar la red. Usa
  * getNow() (el reloj del modo dev) para que las fechas se prueben con la hora
  * simulada.
  */
@@ -80,17 +81,21 @@ export async function ejecutarChequeoHorarios(
       return;
     }
 
-    const resultado = decidirFase(estado, ahora, CONFIG_CHEQUEO_HORARIOS);
-
-    if (resultado.fase === "siguiente-ventana") {
-      const nueva = inicioVentanaVigente(ahora, CONFIG_CHEQUEO_HORARIOS);
-      await persistir({
-        ...estadoChequeoVacio(),
-        ventanaActiva: nueva.toISOString(),
-      });
-      onResult?.({ fase: "idle", mensaje: null });
-      return;
+    // Si faltan las fechas del calendario (instalación nueva o estado viejo sin
+    // fin de clases), se obtienen on-demand: sin ellas el chequeo no puede saber
+    // cuándo hay vacaciones. Si falla, se reintenta en la próxima corrida.
+    if (estado.fechaFinDeClases === null || estado.fechaInicioLabores === null) {
+      try {
+        await obtenerDatosCalendario();
+      } catch (error) {
+        console.error(
+          "[horarios] error al obtener los datos del calendario:",
+          error,
+        );
+      }
     }
+
+    const resultado = decidirFase(estado, ahora, CONFIG_CHEQUEO_HORARIOS);
 
     // Turno de reinscripción: la fecha de orden de reinscripción + prehorarios
     // (actividad 5) ya es hoy o pasó → avisar una sola vez.
@@ -109,17 +114,38 @@ export async function ejecutarChequeoHorarios(
 
     switch (resultado.fase) {
       case "buscar-calendario": {
-        const oficial = await obtenerCalendarioOficial();
-        if (oficial && oficial.archivo !== estado.calendarioVisto) {
-          await persistir({
-            ...estado,
-            calendarioVisto: oficial.archivo,
-          });
-          onResult?.({
-            fase: "buscar-calendario",
-            mensaje: CALENDARIO_DISPONIBLE_TOAST,
-          });
+        // Cadencia: durante las vacaciones el listado se consulta a lo sumo
+        // cada 7 días.
+        if (!pasoTiempoBusquedaCalendario(estado, ahora, CONFIG_CHEQUEO_HORARIOS)) {
+          onResult?.({ fase: "idle", mensaje: null });
+          break;
         }
+
+        const ultimaBusqueda = ahora.toISOString();
+        let detectado: string | null = null;
+
+        try {
+          const listado = await obtenerPrehorarios();
+          const elegido = elegirCalendario(listado.todos ?? []);
+          if (elegido !== null && elegido.archivo !== estado.calendarioProcesado) {
+            detectado = elegido.archivo;
+          }
+        } catch (error) {
+          console.error(
+            "[horarios] error al buscar el calendario en el listado:",
+            error,
+          );
+        }
+
+        // Detección silenciosa (decisión del dueño, 2026-09-08): no se anuncia
+        // toast; las fechas se aplican en la corrida siguiente con
+        // «procesar-calendario».
+        await persistir({
+          ...estado,
+          calendarioVisto: detectado ?? estado.calendarioVisto,
+          ultimaBusquedaCalendario: ultimaBusqueda,
+        });
+        onResult?.({ fase: "buscar-calendario", mensaje: null });
         break;
       }
       case "procesar-calendario": {
@@ -127,17 +153,21 @@ export async function ejecutarChequeoHorarios(
         const lectura = await leerFechasInicioLabores(
           urlDocumentoPdf(estado.calendarioVisto),
         );
-        if (lectura.fechas.length === 0 && lectura.publicacionPrehorarios.length === 0) {
+        if (
+          lectura.fechas.length === 0 &&
+          lectura.publicacionPrehorarios.length === 0
+        ) {
           break;
         }
-        await persistir({
-          ...estado,
-          fechaInicioLabores:
-            elegirProximaFechaLabores(lectura.fechas, ahora) ??
-            estado.fechaInicioLabores,
-          fechaPublicacionPrehorarios:
-            lectura.publicacionPrehorarios[0] ?? estado.fechaPublicacionPrehorarios,
-        });
+        await persistir(
+          estadoTrasAplicarCalendario(
+            estado,
+            lectura,
+            estado.calendarioVisto,
+            ahora,
+          ),
+        );
+        onResult?.({ fase: "procesar-calendario", mensaje: null });
         break;
       }
       case "buscar-prehorario": {

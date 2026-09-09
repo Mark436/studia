@@ -4,55 +4,62 @@
 // *encontró* para no repetir avisos. Toda la lógica es pura y recibe la hora
 // desde fuera (getNow()), de modo que el modo dev la prueba con su reloj
 // simulado. El chequeo no depende de una sesión activa.
+//
+// El calendario del ciclo siguiente se rastrea durante las vacaciones de fin
+// de clases: desde el último día de clases del periodo en curso
+// (`fechaFinDeClases`) hasta el inicio de labores del siguiente
+// (`fechaInicioLabores`), consultando el listado de documentos a lo sumo cada
+// 7 días. Fuera de esa ventana el único calendario que entra es el que se
+// pide on-demand cuando faltan los datos.
 
 export const HORA_CHEQUEO = 18;
 
-/** Ventana anual de publicación del calendario escolar (mes 1..12, día). */
-export interface VentanaCalendario {
-  mes: number;
-  dia: number;
-}
+/** Días que deben pasar entre consultas del listado buscando el calendario. */
+export const DIAS_ENTRE_BUSQUEDAS = 7;
 
 export interface ConfigChequeoHorarios {
-  ventanasBusquedaCalendario: readonly VentanaCalendario[];
+  /** Días mínimo entre búsquedas del calendario durante las vacaciones. */
+  diasEntreBusquedasCalendario: number;
+  /** Espera tras inicio de labores si el PDF no trae la actividad 5. */
   diasTrasLabores: number;
   horaChequeo: number;
 }
 
-/** Ventanas de búsqueda del calendario oficial (recurrentes cada año). El mes
- * es 1-based (12 = diciembre) y se convierte a índice al construir las fechas. */
 export const CONFIG_CHEQUEO_HORARIOS: ConfigChequeoHorarios = {
-  ventanasBusquedaCalendario: [
-    { mes: 12, dia: 15 }, // 15 de diciembre → calendario del ciclo ENE-JUN
-    { mes: 5, dia: 15 }, //  15 de mayo       → calendario del ciclo AGO-DIC
-  ],
+  diasEntreBusquedasCalendario: DIAS_ENTRE_BUSQUEDAS,
   diasTrasLabores: 1,
   horaChequeo: 18,
 };
 
 export interface EstadoChequeoHorarios {
-  /** Último archivo de calendario oficial visto (null = ninguno). */
+  /** Último archivo de calendario detectado en el listado (pendiente o ya aplicado). */
   calendarioVisto: string | null;
-  /** Inicio de la ventana que se está cazando (ISO de fecha, null = sin asignar). */
-  ventanaActiva: string | null;
-  /** Fecha de inicio de labores del ciclo en curso (null = sin extraer). */
+  /** Último archivo de calendario *aplicado* (del que vienen las fechas). */
+  calendarioProcesado: string | null;
+  /** Último día de clases del periodo en curso (inicio de la búsqueda vacacional). */
+  fechaFinDeClases: Date | null;
+  /** Inicio de labores del siguiente periodo (fin de la búsqueda vacacional). */
   fechaInicioLabores: Date | null;
   /** Fecha de publicación de orden de reinscripción + Prehorarios (actividad 5). */
   fechaPublicacionPrehorarios: Date | null;
-  /** Último prehorario de la carrera visto (null = ninguno). */
+  /** Último prehorario de la carrera visto en el ciclo actual (null = ninguno). */
   prehorarioVisto: string | null;
   /** Ya se avisó que el turno de reinscripción puede estar publicado. */
   avisoTurnosEnviado: boolean;
+  /** Última consulta del listado buscando calendario (ISO, cadencia 7 días). */
+  ultimaBusquedaCalendario: string | null;
 }
 
 export function estadoChequeoVacio(): EstadoChequeoHorarios {
   return {
     calendarioVisto: null,
-    ventanaActiva: null,
+    calendarioProcesado: null,
+    fechaFinDeClases: null,
     fechaInicioLabores: null,
     fechaPublicacionPrehorarios: null,
     prehorarioVisto: null,
     avisoTurnosEnviado: false,
+    ultimaBusquedaCalendario: null,
   };
 }
 
@@ -66,13 +73,22 @@ export function parseEstadoChequeo(raw: string | null): EstadoChequeoHorarios {
     const stringO = (valor: unknown): string | null =>
       typeof valor === "string" ? valor : null;
 
+    // Migración desde el esquema anterior (ventanas 15-dic/15-mayo): ese
+    // estado ya tenía un calendario visto y sus fechas aplicadas; se asume que
+    // está procesado aunque el campo nuevo no exista.
+    const calendarioVisto = stringO(obj.calendarioVisto);
+    const calendarioProcesado =
+      stringO(obj.calendarioProcesado) ?? calendarioVisto;
+
     return {
-      calendarioVisto: stringO(obj.calendarioVisto),
-      ventanaActiva: stringO(obj.ventanaActiva),
+      calendarioVisto,
+      calendarioProcesado,
+      fechaFinDeClases: fechaDe(obj.fechaFinDeClases),
       fechaInicioLabores: fechaDe(obj.fechaInicioLabores),
       fechaPublicacionPrehorarios: fechaDe(obj.fechaPublicacionPrehorarios),
       prehorarioVisto: stringO(obj.prehorarioVisto),
       avisoTurnosEnviado: obj.avisoTurnosEnviado === true,
+      ultimaBusquedaCalendario: stringO(obj.ultimaBusquedaCalendario),
     };
   } catch {
     return estadoChequeoVacio();
@@ -84,12 +100,14 @@ export function serializarEstadoChequeo(
 ): string {
   return JSON.stringify({
     calendarioVisto: estado.calendarioVisto,
-    ventanaActiva: estado.ventanaActiva,
+    calendarioProcesado: estado.calendarioProcesado,
+    fechaFinDeClases: estado.fechaFinDeClases?.toISOString() ?? null,
     fechaInicioLabores: estado.fechaInicioLabores?.toISOString() ?? null,
     fechaPublicacionPrehorarios:
       estado.fechaPublicacionPrehorarios?.toISOString() ?? null,
     prehorarioVisto: estado.prehorarioVisto,
     avisoTurnosEnviado: estado.avisoTurnosEnviado,
+    ultimaBusquedaCalendario: estado.ultimaBusquedaCalendario,
   });
 }
 
@@ -129,57 +147,39 @@ export function proximoMomentoChequeo(
       );
 }
 
-function candidatosVentana(
-  alrededor: Date,
-  config: ConfigChequeoHorarios,
-): Date[] {
-  const candidatos: Date[] = [];
-
-  for (
-    const anio of [
-      alrededor.getFullYear() - 1,
-      alrededor.getFullYear(),
-      alrededor.getFullYear() + 1,
-    ]
-  ) {
-    for (const ventana of config.ventanasBusquedaCalendario) {
-      candidatos.push(new Date(anio, ventana.mes - 1, ventana.dia));
-    }
-  }
-
-  return candidatos.sort((a, b) => a.getTime() - b.getTime());
-}
-
 /**
- * Ventana que se está cazando: el inicio más reciente (pasado o presente); si
- * todavía ninguna ha arrancado, la próxima.
+ * ¿Estamos dentro de la ventana vacacional? Sí entre el fin de clases del
+ * periodo en curso y el inicio de labores del siguiente. Si las fechas están
+ * invertidas (fin > inicio, p. ej. tras procesar un calendario del ciclo
+ * siguiente a mitad de vacaciones) es que ya no hay ventana activa.
  */
-export function inicioVentanaVigente(
+export function enVentanaVacacional(
+  estado: Pick<EstadoChequeoHorarios, "fechaFinDeClases" | "fechaInicioLabores">,
   ahora: Date,
-  config: ConfigChequeoHorarios = CONFIG_CHEQUEO_HORARIOS,
-): Date {
-  const candidatos = candidatosVentana(ahora, config);
-  const pasadas = candidatos.filter(
-    candidato => candidato.getTime() <= ahora.getTime(),
-  );
+): boolean {
+  const fin = estado.fechaFinDeClases;
+  const inicio = estado.fechaInicioLabores;
+  if (fin === null || inicio === null) return false;
 
-  return pasadas.length > 0 ? pasadas[pasadas.length - 1] : candidatos[0];
+  return (
+    ahora.getTime() >= fin.getTime() && ahora.getTime() < inicio.getTime()
+  );
 }
 
-/** Próxima ventana estrictamente posterior a `ventanaActiva` (null si no). */
-export function siguienteVentana(
-  ventanaActiva: string,
+/** ¿Ya pasaron los `diasEntreBusquedas` desde la última consulta del listado? */
+export function pasoTiempoBusquedaCalendario(
+  estado: EstadoChequeoHorarios,
   ahora: Date,
   config: ConfigChequeoHorarios = CONFIG_CHEQUEO_HORARIOS,
-): Date | null {
-  const activa = new Date(ventanaActiva);
-  if (Number.isNaN(activa.getTime())) return null;
+): boolean {
+  if (estado.ultimaBusquedaCalendario === null) return true;
+  const ultima = new Date(estado.ultimaBusquedaCalendario);
+  if (Number.isNaN(ultima.getTime())) return true;
 
-  const futuras = candidatosVentana(ahora, config).filter(
-    candidato => candidato.getTime() > activa.getTime(),
+  return (
+    ahora.getTime() - ultima.getTime() >=
+    config.diasEntreBusquedasCalendario * 86_400_000
   );
-
-  return futuras[0] ?? null;
 }
 
 /**
@@ -199,13 +199,12 @@ export function elegirProximaFechaLabores(
 }
 
 export type FaseChequeoHorarios =
-  | "antes-buscar-calendario"
-  | "buscar-calendario"
   | "procesar-calendario"
+  | "buscar-calendario"
   | "esperar-prehorario"
   | "buscar-prehorario"
   | "completado"
-  | "siguiente-ventana";
+  | "sin-datos";
 
 export interface ResultadoChequeo {
   fase: FaseChequeoHorarios;
@@ -214,10 +213,9 @@ export interface ResultadoChequeo {
 }
 
 const FASES_CON_ACCION: ReadonlySet<FaseChequeoHorarios> = new Set([
-  "buscar-calendario",
   "procesar-calendario",
+  "buscar-calendario",
   "buscar-prehorario",
-  "siguiente-ventana",
 ]);
 
 function conAccion(
@@ -254,14 +252,25 @@ export function decidirFase(
   ahora: Date,
   config: ConfigChequeoHorarios = CONFIG_CHEQUEO_HORARIOS,
 ): ResultadoChequeo {
-  if (estado.ventanaActiva !== null) {
-    const siguiente = siguienteVentana(estado.ventanaActiva, ahora, config);
-    if (siguiente !== null && ahora.getTime() >= siguiente.getTime()) {
-      return conAccion(
-        "siguiente-ventana",
-        "Comenzó una nueva ventana de publicación; reinicia el ciclo.",
-      );
-    }
+  // Un calendario nuevo detectado (¿pendiente de procesar?) manda antes que
+  // cualquier otra fase: hay que terminar de aplicar sus fechas.
+  if (
+    estado.calendarioVisto !== null &&
+    estado.calendarioVisto !== estado.calendarioProcesado
+  ) {
+    return conAccion(
+      "procesar-calendario",
+      "Se detectó un calendario nuevo; falta leer sus fechas del PDF.",
+    );
+  }
+
+  // Vacaciones de fin de clases: toca buscar el calendario del ciclo siguiente
+  // (la cadencia de 7 días se decide en el integrador, no aquí).
+  if (enVentanaVacacional(estado, ahora)) {
+    return conAccion(
+      "buscar-calendario",
+      "Vacaciones de fin de clases: toca buscar el calendario del siguiente ciclo.",
+    );
   }
 
   if (estado.prehorarioVisto !== null) {
@@ -286,25 +295,47 @@ export function decidirFase(
     );
   }
 
-  if (estado.calendarioVisto !== null) {
-    return conAccion(
-      "procesar-calendario",
-      "Calendario visto; falta extraer sus fechas del PDF.",
-    );
-  }
-
-  const ventana = inicioVentanaVigente(ahora, config);
-  if (ahora.getTime() < ventana.getTime()) {
-    return conAccion(
-      "antes-buscar-calendario",
-      "Todavía no toca buscar el calendario.",
-    );
-  }
-
   return conAccion(
-    "buscar-calendario",
-    "Toca buscar el calendario oficial.",
+    "sin-datos",
+    "Faltan las fechas del calendario; se obtienen on-demand.",
   );
+}
+
+/**
+ * Forma mínima de la lectura del calendario (evita acoplar este módulo con el
+ * resultado completo de pdfjs: `ResultadoLecturaCalendario` en calendarioLabores).
+ */
+export interface LecturaCalendario {
+  fechas: readonly Date[];
+  publicacionPrehorarios: readonly Date[];
+  finDeClases: Date | null;
+}
+
+/**
+ * Aplica las fechas de un calendario al estado. Si el archivo es distinto del
+ * ya procesado, reinicia el ciclo de prehorario (es un periodo nuevo): se
+ * limpian `prehorarioVisto` y `avisoTurnosEnviado` para empezar limpios.
+ */
+export function estadoTrasAplicarCalendario(
+  estado: EstadoChequeoHorarios,
+  lectura: LecturaCalendario,
+  archivo: string,
+  ahora: Date,
+): EstadoChequeoHorarios {
+  const esNuevo = archivo !== estado.calendarioProcesado;
+
+  return {
+    ...estado,
+    calendarioProcesado: archivo,
+    calendarioVisto: archivo,
+    fechaInicioLabores:
+      elegirProximaFechaLabores(lectura.fechas, ahora) ??
+      estado.fechaInicioLabores,
+    fechaFinDeClases: lectura.finDeClases ?? estado.fechaFinDeClases,
+    fechaPublicacionPrehorarios:
+      lectura.publicacionPrehorarios[0] ?? estado.fechaPublicacionPrehorarios,
+    ...(esNuevo ? { prehorarioVisto: null, avisoTurnosEnviado: false } : {}),
+  };
 }
 
 function esMismaFechaODespues(fecha: Date, ahora: Date): boolean {

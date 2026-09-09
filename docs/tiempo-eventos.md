@@ -55,22 +55,24 @@ lo que es **sesión / persistencia** usa el reloj real. No mezclar.
 | Regla | Valor |
 | --- | --- |
 | Hora del bucle | `HORA_CHEQUEO = 18` (`busquedaHorarios.ts:8`) — desde las **18:00** (`esHoraChequeo`: `getHours() >= 18`) |
-| Ventanas anuales del calendario | `[{ mes: 12, dia: 15 }, { mes: 5, dia: 15 }]` = **15-dic** (ciclo ENE-JUN) y **15-mayo** (ciclo AGO-DIC) (`:24-31`) |
+| Ventana vacacional | `[fechaFinDeClases, fechaInicioLabores)` = fin de clases del periodo en curso → inicio de labores del ciclo siguiente (p. ej. 11-dic-2026 → 6-ene-2027) |
+| Cadencia de búsqueda del calendario | `diasEntreBusquedasCalendario = 7` — el listado se consulta a lo sumo cada 7 días dentro de la ventana (`pasoTiempoBusquedaCalendario`) |
 | Espera tras labores (fallback) | `diasTrasLabores = 1` |
-| Gate de horas | **no existe**: el bucle vuelve a buscar cada vez que corre a las 18:00; solo avisa lo nuevo |
+| Gate de horas | **no existe**: el bucle vuelve a evaluar cada vez que corre a las 18:00; solo avisa lo nuevo |
 | Cadencia | 1 vez por día a las 18:00 (si la app está abierta) |
 
-### Máquina de fases (`decidirFase`, `:252-308`)
+### Máquina de fases (`decidirFase`)
 
-`antes-buscar-calendario` → `buscar-calendario` → `procesar-calendario` →
-`esperar-prehorario` → `buscar-prehorario` → `completado`; y `siguiente-ventana`
-cuando arranca una ventana nueva (resetea el estado y arranca el ciclo
-siguiente). Fases con acción (`FASES_CON_ACCION`): `buscar-calendario`,
-`procesar-calendario`, `buscar-prehorario`, `siguiente-ventana`.
+`procesar-calendario` → `buscar-calendario` → `esperar-prehorario` →
+`buscar-prehorario` → `completado`; y `sin-datos` cuando no hay calendario
+procesado (se completa on-demand con `obtenerDatosCalendario()`). Un calendario
+nuevo detectado durante las vacaciones manda sobre el resto. Fases con acción
+(`FASES_CON_ACCION`): `procesar-calendario`, `buscar-calendario`,
+`buscar-prehorario`.
 
 Disparo del prehorario: **fecha de la actividad 5** del calendario
 (`fechaPublicacionPrehorarios`); si el PDF no la trae, fallback `labores +
-diasTrasLabores` (`objetivoPrehorario`, `:234-249`).
+diasTrasLabores` (`objetivoPrehorario`).
 
 ### Disparadores (hook `useHorariosCheck.ts`)
 
@@ -79,36 +81,39 @@ diasTrasLabores` (`objetivoPrehorario`, `:234-249`).
   (cooldown `COOLDOWN_MS = 500`);
 - al **recuperar la conexión** (`online`);
 - **timer que re-agenda el próximo 18:00** (`proximoMomentoChequeo`), piso de
-  1000 ms — el bucle sigue vivo mientras la app está abierta (`:203-215`).
+  1000 ms — el bucle sigue vivo mientras la app está abierta.
 
 ### Guardas
 
 - `esHoraChequeo`: antes de las 18:00 **no se toca el API**.
+- `pasoTiempoBusquedaCalendario`: dentro de la ventana vacacional el listado se
+  consulta a lo sumo cada 7 días.
 - **Offline**: `if (!navigator.onLine) return` — sin conexión no se busca ni se
-  persiste; el listener `online` re-dispara (`:69-72`).
+  persiste; el listener `online` re-dispara.
 
 ### Avisos que emite
 
-- `CALENDARIO_DISPONIBLE_TOAST` (PDF nuevo), `PREHORARIO_DISPONIBLE_TOAST`
-  (prehorario de la carrera nuevo) — 1 vez por archivo.
+- La detección del calendario es **silenciosa** (decisión del dueño, 2026-09-08;
+  sin toast). `PREHORARIO_DISPONIBLE_TOAST` (prehorario de la carrera nuevo) —
+  1 vez por archivo.
 - `TURNOS_REINSCRIPCION_TOAST` — el mismo día en que la fecha de la actividad 5
   **ya pasó**, **una sola vez** (`avisoTurnosEnviado`); se decide con
-  `tocaAvisarTurnosReinscripcion` (`busquedaHorarios.ts:330-338`).
-- Variant en `App.tsx:158-161`: `buscar-prehorario` = `success`, resto =
-  `neutral`.
+  `tocaAvisarTurnosReinscripcion`.
+- Variant en `App.tsx`: `buscar-prehorario` = `success`, resto = `neutral`.
 
 ### Fuentes
 
 | Publicación | Fuente |
 | --- | --- |
-| Calendario oficial | `ith.mx/calendario-escolar.html` (PDF incrustado; **cambio de nombre de archivo**) — `obtenerCalendarioOficial()` (`lib/prehorario.ts`) |
-| Prehorario de la carrera | listado `ith.mx/documentos/?C=M;O=D` — `obtenerPrehorarios()` + `elegirPrehorarioCarrera()` |
+| Calendario del ciclo siguiente | listado `ith.mx/documentos/?C=M;O=D` — primer `*calendario*` (`elegirCalendario()`, `lib/prehorario.ts`) |
+| Prehorario de la carrera | mismo listado — `obtenerPrehorarios()` + `elegirPrehorarioCarrera()` |
 
 Fechas reales de publicación verificadas: 2026-1 V1 **26-ene-2026** (¡tras el
 inicio de labores 7-ene!), V2 04-feb, V2-2 22-abr; 2026-2 V1 **29-may**, V2
-12-ago; 2024-1 18-dic-2023; 2023-1 10-ene-2023. No hay patrón estable anual →
-búsqueda diaria. El calendario **no anuncia su propia publicación** (se detecta
-por cambio de archivo / metadata del PDF / orden del listado).
+12-ago; 2024-1 18-dic-2023; 2023-1 10-ene-2023. No hay patrón estable →
+búsqueda por **primer `*calendario*` del listado** dentro de la ventana
+vacacional (cadencia 7 días, sin límite de antigüedad). El calendario **no
+anuncia su propia publicación**.
 
 ---
 
@@ -194,7 +199,7 @@ minutal vía `useCurrentTime` (ver §1).
 | AppData cacheado | `AuthProvider` (`:292-296`) login **y** refresh | `loadedAt` (`new Date().toISOString()`) |
 | Último login | `AuthProvider.tsx:159` | `lastLoginAt` (solo login, no refresh) |
 | Nudge día | `App.tsx:215` | `lastReAuthPromptDate` (`toDateKey`) |
-| Estado del chequeo | `useHorariosCheck.ts` | ISO: `ventanaActiva`, `fechaInicioLabores`, `fechaPublicacionPrehorarios` |
+| Estado del chequeo | `useHorariosCheck.ts` | ISO: `calendarioVisto`, `calendarioProcesado`, `fechaInicioLabores`, `fechaFinDeClases`, `fechaPublicacionPrehorarios`, `ultimaBusquedaCalendario` |
 | Tracking de calificaciones | `lib/storage/gradeTracking.ts` | sin timestamps; primer fetch = baseline, luego diffs |
 | Records de IndexedDB | `lib/storage/db.ts` | **sin `updatedAt`/`modifiedAt` automático** (`StoreEntry = {key,value}`) |
 
@@ -212,8 +217,10 @@ pero no expira nada**.
   del listado Apache; los bots de horario/prehorario validan contra `getNow()`
   con `esFechaDentroVentana(fecha, ahora, ventanaDias)` = 7 días (`:352-364`).
 - `calendarioLabores.ts` — parser de fechas: inicio de labores (mes < 8 →
-  ciclo siguiente, `:79-80`), actividad 5 (día en celda + mes por encabezado de
-  columna + año del periodo, **sin** regla +1).
+  ciclo siguiente), actividad 5 (día en celda + mes por encabezado de columna +
+  año del periodo, **sin** regla +1) y fin de clases (`extraerFinDeClases`, la
+  fila «Fin de clases» más tardía, **sin** la regla +1 — pertenece al propio
+  periodo).
 
 ---
 
@@ -242,7 +249,7 @@ por hijo (`index.css:341-359`).
 | --- | --- | --- | --- |
 | Hora actual del horario | cada **minuto**, + foreground, + cambio de reloj dev | `getNow()` | `useCurrentTime.ts` |
 | Chequeo de documentos | **18:00** diario (open / foreground / online / timer) | `getNow()` | `useHorariosCheck.ts` |
-| Ventanas del calendario | 15-dic (ENE-JUN), 15-mayo (AGO-DIC) | `getNow()` | `busquedaHorarios.ts` |
+| Búsqueda del calendario | **vacaciones** (fin de clases → inicio de labores), a lo sumo cada **7 días** | `getNow()` | `busquedaHorarios.ts` |
 | Aviso de turnos de reinscripción | **una vez**, cuando la fecha ya pasó | `getNow()` | `busquedaHorarios.ts` + `App.tsx` |
 | Nudge de sesión vieja | 1 vez por día si sesión ≥ **23 h** | real | `App.tsx` |
 | Toasts | one-shot por fetch real; **1300 ms** de duración | — | `App.tsx` / `toastVariants.ts` |

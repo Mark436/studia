@@ -18,34 +18,38 @@ documentos):
 
 | Publicación | Fuente |
 | --- | --- |
-| Calendario oficial | `ith.mx/calendario-escolar.html` (PDF incrustado; el nombre del archivo cambia al actualizarse. `obtenerCalendarioOficial()`) |
-| Prehorario de la carrera | listado público `ith.mx/documentos/?C=M;O=D` (`obtenerPrehorarios()` + `elegirPrehorarioCarrera()`) |
+| Calendario del ciclo siguiente | listado público `ith.mx/documentos/?C=M;O=D` — primer archivo `*calendario*` (`elegirCalendario()`) |
+| Prehorario de la carrera | mismo listado (`obtenerPrehorarios()` + `elegirPrehorarioCarrera()`) |
 
-Dos **ventanas anuales** vigilan el calendario: **15 de diciembre** (ciclo
-ENE-JUN) y **15 de mayo** (ciclo AGO-DIC). Dentro de cada ventana el chequeo
-corre **todos los días a las 18:00**. Al detectar algo nuevo anuncia un toast y
-guarda el estado para no volver a avisar.
+El calendario se busca **dentro de las vacaciones de fin de clases**: desde el
+**último día de clases del periodo en curso** (`fechaFinDeClases`, p. ej.
+11-dic-2026) hasta el **inicio de labores del ciclo siguiente**
+(`fechaInicioLabores`, p. ej. 6-ene-2027). Dentro de esa ventana el chequeo
+corre **a las 18:00** a lo sumo **cada 7 días** y elige el primer `*calendario*`
+del listado; al detectar uno nuevo lo aplica **silenciosamente** (sin toast) y
+guarda el estado para no reprocesarlo. No hay ventanas anuales ni límite de
+antigüedad sobre el archivo.
 
 ### Máquina de fases (`src/lib/busquedaHorarios.ts`, lógica pura)
 
 | Fase | Cuándo toca | Qué hace | Estado |
 | --- | --- | --- | --- |
-| `antes-buscar-calendario` | antes de toda ventana | nada (espera) | ✅ |
-| `buscar-calendario` | dentro de una ventana, sin calendario visto | consulta página oficial; PDF nuevo → aviso + `calendarioVisto` | ✅ |
-| `procesar-calendario` | calendario visto sin procesar | lee el PDF; guarda inicio de labores **y** fecha de publicación de prehorarios (actividad 5) | ✅ |
-| `esperar-prehorario` | con fecha en mano | espera a la fecha de la actividad 5 (fallback: labores + `diasTrasLabores`) | ✅ |
+| `procesar-calendario` | hay calendario visto sin procesar (o coincide con el listado) | lee el PDF; guarda inicio de labores, **fin de clases** y fecha de publicación de prehorarios (actividad 5) | ✅ |
+| `buscar-calendario` | dentro de la ventana vacacional | consulta listado (mínimo 7 días entre consultas); archivo nuevo → `calendarioVisto` **silencioso** | ✅ |
+| `esperar-prehorario` | fuera de vacaciones, con fecha en mano | espera a la fecha de la actividad 5 (fallback: labores + `diasTrasLabores`) | ✅ |
 | `buscar-prehorario` | fecha cumplida | consulta listado; prehorario de la carrera nuevo → aviso | ✅ |
-| `completado` | prehorario visto | no hace nada más en el ciclo | ✅ |
-| `siguiente-ventana` | arranca una ventana nueva | resetea el estado y empieza el ciclo siguiente | ✅ |
+| `completado` | prehorario visto | no hace nada más en este ciclo | ✅ |
+| `sin-datos` | sin calendario procesado | no busca; los datos se completan on-demand (`obtenerDatosCalendario()`) | ✅ |
 
 ### Umbrales y fechas (están en `busquedaHorarios.ts`)
 
 | Constante | Valor | Significado |
 | --- | --- | --- |
-| `CONFIG_CHEQUEO_HORARIOS.ventanasBusquedaCalendario` | `[{ mes: 12, dia: 15 }, { mes: 5, dia: 15 }]` | **15 de diciembre** (ENE-JUN) y **15 de mayo** (AGO-DIC), recurrentes cada año |
+| `CONFIG_CHEQUEO_HORARIOS.diasEntreBusquedasCalendario` | **7 días** | cadencia mínima entre consultas del listado dentro de la ventana vacacional |
 | `CONFIG_CHEQUEO_HORARIOS.diasTrasLabores` | **1 día** | espera tras inicio de labores solo si falta la actividad 5 |
 | `CONFIG_CHEQUEO_HORARIOS.horaChequeo` (`HORA_CHEQUEO`) | **18 (18:00)** | momento del bucle diario (si la app está abierta) |
-| — | sin gate de 24 h | **no se contabiliza** si «ya se chequeó»: el bucle busca cada vez que corre a las 18:00 |
+| Ventana vacacional | `[fechaFinDeClases, fechaInicioLabores)` | delimita la búsqueda del calendario del ciclo siguiente |
+| — | sin gate de 24 h | **no se contabiliza** si «ya se chequeó»: el bucle evalúa/filtra cada vez que corre a las 18:00 |
 
 ---
 
@@ -71,15 +75,16 @@ Es un disparador **reactivo + timer**, no un proceso de fondo.
 
 Cada vez que corre:
 
-- decide la fase con `decidirFase(estado, ahora)` (y `CONFIG_CHEQUEO_HORARIOS`);
+- si faltan las fechas del calendario (instalación nueva / estado migrado sin
+  fin de clases), las obtiene on-demand con `obtenerDatosCalendario()`;
+- decide la fase con `decidirFase(estado, ahora, CONFIG_CHEQUEO_HORARIOS)`;
 - si la fecha de la actividad 5 es hoy o ya pasó y no se ha avisado, emite el
   toast de **turnos de reinscripción** (`TURNOS_REINSCRIPCION_TOAST`) y guarda
   `avisoTurnosEnviado`;
-- si la fase `siguiente-ventana` toca, resetea el estado y arranca el ciclo nuevo;
-- si la fase tiene acción (`tocaAccion`), ejecuta el fetch correspondiente. El
-  resultado relevante se anuncia como toast
-  (`CALENDARIO_DISPONIBLE_TOAST` / `PREHORARIO_DISPONIBLE_TOAST`) desde
-  `App.tsx`.
+- si la fase tiene acción (`tocaAccion`), ejecuta el fetch correspondiente. La
+  detección del calendario es **silenciosa** (sin toast); el único toast del
+  chequeo es el prehorario de la carrera (`PREHORARIO_DISPONIBLE_TOAST`) y va
+  desde `App.tsx`.
 
 **Qué NO existe todavía:**
 
@@ -104,13 +109,19 @@ después de que debería estar publicado.
 
 ---
 
-## 4. Calendario del ciclo AGO-DIC (ventana 15 de mayo)
+## 4. Calendario del ciclo siguiente (búsqueda por listado en vacaciones)
 
-- El **15 de mayo** es la segunda ventana anual: a partir de ahí (y hasta
-  detectar el PDF nuevo) se busca diario el calendario del ciclo **AGO-DIC**.
-- **No existe un archivo «SIG»**: la detección es por **cambio del PDF
-  incrustado** en `ith.mx/calendario-escolar.html` (cambia de nombre al año /
-  versión, p. ej. `CALENDARIO_ESCOLAR_2026-2 V2.pdf`).
+- **No existen ventanas anuales** (15-dic / 15-mayo fueron descartadas). La
+  búsqueda del calendario del ciclo siguiente corre **desde el fin de clases**
+  del periodo en curso hasta el **inicio de labores** del siguiente — decisión
+  del dueño, 2026-09-08.
+- **No existe un archivo «SIG»**: la detección es por el **primer `*calendario*`
+  del listado** `documentos/?C=M;O=D` (el más reciente del orden del servidor),
+  con una consulta a lo sumo cada **7 días** y **sin límite de antigüedad** sobre
+  el archivo. Al detectar uno distinto al ya procesado se aplica y el ciclo de
+  prehorario se reinaugura.
+- Si el estado no tiene las fechas (instalación nueva o usuarias/os migrados del
+  esquema de ventanas), se completan **on-demand** (`obtenerDatosCalendario()`).
 
 ---
 
@@ -119,12 +130,11 @@ después de que debería estar publicado.
 | Evento | Cada cuánto | Quién lo dispara | Dónde está | Estado |
 | --- | --- | --- | --- | --- |
 | Chequeo calendario/prehorario | 1 vez por día a las 18:00 (si app abierta) | open + foreground + `online` + timer 18:00 | `useHorariosCheck.ts` / `busquedaHorarios.ts` | ✅ |
-| Búsqueda de calendario (ventana ENE-JUN) | diaria desde 15-dic | fase `buscar-calendario` | `busquedaHorarios.ts:decidirFase` | ✅ |
-| Búsqueda de calendario (ventana AGO-DIC) | diaria desde 15-mayo | fase `buscar-calendario` | ídem | ✅ |
-| Procesar PDF del calendario | al detectar PDF nuevo | fase `procesar-calendario` | `calendarioLabores.ts` | ✅ |
+| Búsqueda de calendario | durante las vacaciones, a lo sumo cada 7 días | fase `buscar-calendario` (+ gate `pasoTiempoBusquedaCalendario`) | `busquedaHorarios.ts:decidirFase` | ✅ |
+| Procesar PDF del calendario | al detectar calendario nuevo | fase `procesar-calendario` | `calendarioLabores.ts` | ✅ |
 | Búsqueda de prehorario | diaria desde la fecha de la actividad 5 | fase `buscar-prehorario` | `busquedaHorarios.ts` | ✅ |
+| Datos del calendario on-demand | cuando faltan fechas (instalación/migración) | `obtenerDatosCalendario()` | `datosCalendario.ts` | ✅ |
 | Aviso de turnos de reinscripción | una sola vez, cuando la fecha ya pasó | `ejecutarChequeoHorarios` + nudge | `useHorariosCheck.ts` + `App.tsx` | ✅ |
-| Reinicio de ciclo | al arrancar una ventana nueva | fase `siguiente-ventana` | `busquedaHorarios.ts` | ✅ |
 
 ---
 
@@ -184,8 +194,8 @@ calendario reporta:
 
 | Fecha/regla de disparo | Para qué la usamos | ¿Aparece en la muestra 2026-1? | En qué actividad |
 | --- | --- | --- | --- |
-| **15 de diciembre** | Inicio de la ventana de búsqueda del **calendario ENE-JUN** | No (el calendario cubre ene-jul). Vigila el PDF publicado para el ciclo siguiente | — |
-| **15 de mayo** | Inicio de la ventana de búsqueda del **calendario AGO-DIC** | Solo coincide como feriado | Act. 49 «Suspensión de labores programada» — **15 (mayo)** |
+| **Fin de clases** del periodo en curso | Inicio de la **ventana vacacional** que dispara la búsqueda del calendario del ciclo siguiente | Sí (ciclo ene-jul) | Act. 58/59 «Fin de clases» — **29 may** |
+| **Inicio de labores** del ciclo siguiente | Fin de la ventana vacacional (se deja de buscar) | Sí | Act. 1 «Inicio de labores» — **7 ene**; act. 70 — **3 ago** (ciclo siguiente) |
 | **Fecha de la actividad 5** | Disparo de la búsqueda del **prehorario** y del aviso de **turnos de reinscripción** | Sí | Act. 5 «Publicación de orden de reinscripción, referencia bancaria y **Prehorarios**» — **9 ene** |
 | Fallback: inicio de labores + 1 día | Solo si el PDF no trae la actividad 5 (`diasTrasLabores`) | Sí | Act. 1 «Inicio de labores» — **7 ene**; act. 70 — **3 ago** (ciclo siguiente) |
 
@@ -195,30 +205,32 @@ del PDF — `CreationDate` — y el orden del listado
 
 | Archivo | Detección en el listado |
 | --- | --- |
-| `CALENDARIO_ESCOLAR_2026-2 V1.pdf` | **29-may-2026** (dentro de la ventana 15-mayo) |
+| `CALENDARIO_ESCOLAR_2026-2 V1.pdf` | 29-may-2026 (mismo día del fin de clases) |
 | `CALENDARIO_ESCOLAR_2026-2 V2.pdf` | 12-ago-2026 |
 | `CALENDARIO_ESCOLAR_2026-1 V1.pdf` | **26-ene-2026** (¡después del inicio de labores 7-ene!) |
 | `CALENDARIO_ESCOLAR_2026-1 V2.pdf` | 04-feb-2026 |
 | `CALENDARIO_ESCOLAR_2026-1 V2-2.pdf` | 22-abr-2026 (metadata 22-abr 10:34, listado 10:48) |
-| `CALENDARIO_ESCOLAR_2024-1.pdf` | 18-dic-2023 (justo tras la ventana 15-dic) |
+| `CALENDARIO_ESCOLAR_2024-1.pdf` | 18-dic-2023 |
 | `CALENDARIO_ESCOLAR_2023-1 V1.pdf` | 10-ene-2023 |
 
 Observaciones útiles para revisar el chequeo diario:
 
-- **El calendario no anuncia su propia publicación**: el PDF incrustado cambia
-  de nombre al actualizarse; la fecha real se ve en la metadata o el orden del
-  listado, no en el contenido. Por eso la búsqueda es diaria y por **cambio de
-  archivo**. El patrón «el calendario se elabora ~3 meses antes» era incorrecto
-  como regla de publicación: 2026-1 salió **26-ene-2026, ya iniciadas las
-  labores**, y 2026-2 salió **29-may-2026**. No hay patrón estable anual →
-  mantener el rastreo diario dentro de cada ventana.
+- **El calendario no anuncia su propia publicación**: el nombre cambia al
+  actualizarse y la fecha real se ve en el orden del listado (`?C=M;O=D`), no en
+  el contenido del PDF. Por eso se busca por **primer `*calendario*` del
+  listado** dentro de la ventana vacacional. El patrón «el calendario se elabora
+  ~3 meses antes» era incorrecto: 2026-1 salió **26-ene-2026, ya iniciadas las
+  labores**, y 2026-2 salió **29-may-2026** (día del fin de clases). No hay
+  patrón estable — el listado cubre cualquier fecha, la cadencia la pone el
+  chequeo (7 días).
 - El **prehorario** salió el **9 de enero** = inicio de labores (7 ene) + 2. El
   disparo actual usa la **fecha de la actividad 5** (9 ene), no adivinar con
   labores + N. Esa misma fecha dispara el aviso de **turnos de reinscripción**
   (act. 7 «Reinscripciones licenciatura» — **14 al 16 ene**).
-- Fin/inicio de clases vienen en el calendario (act. 12/13 — **26 ene**; act.
-  58/59 — **29 may**), pero **no** disparan nada por ahora; solo se sabe que
-  vienen.
+- **Fin de clases** (act. 58/59 — **29 may** en la muestra; **11-dic-2026** en el
+  calendario AGO-DIC 2026) delimita la **ventana vacacional** que busca el
+  calendario del ciclo siguiente. La regla +1 año de «inicio de labores» **no**
+  se aplica al fin de clases: pertenece al propio periodo.
 - Anomalías del PDF que el parser debe tolerar (todas cubiertas): la actividad 6
   se imprime antes que la 5; no existe la actividad 36; la fila 70 trae doble
   encabezado «AGOSTO | MAYO» y es la que reporta el inicio de labores del ciclo

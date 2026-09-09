@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extraerFechasInicioLabores,
   extraerFechasPublicacionPrehorarios,
+  extraerFinDeClases,
 } from "./calendarioLabores";
 
 describe("extraerFechasInicioLabores", () => {
@@ -60,6 +61,44 @@ describe("extraerFechasInicioLabores", () => {
   it("sin menciones devuelve lista vacía", () => {
     expect(extraerFechasInicioLabores("")).toEqual([]);
     expect(extraerFechasInicioLabores("Calendario de festividades")).toEqual([]);
+  });
+});
+
+describe("extraerFinDeClases", () => {
+  it("extrae el último día de clases del periodo AGOSTO-DICIEMBRE (del calendario 2026-2)", () => {
+    const texto =
+      "PERIODO: AGOSTO-DICIEMBRE 2026  No.  ACTIVIDAD  FECHA Y/O PERÍODO  75  Fin de clases  11 de diciembre  76  Fin de cursos de idiomas  11 de diciembre  77  Fin de cursos de Actividades Extraescolares  04 de diciembre";
+    const fin = extraerFinDeClases(texto);
+
+    expect(fin).toEqual(new Date(2026, 11, 11));
+  });
+
+  it("con más de una fila se queda con la más tardía (licenciatura vs idiomas)", () => {
+    const texto =
+      "PERIODO: AGOSTO-DICIEMBRE 2026  Fin de clases de licenciatura y posgrado  28 de mayo  Fin de clases de idiomas  29 de mayo";
+    const fin = extraerFinDeClases(texto);
+
+    expect(fin).toEqual(new Date(2026, 4, 29));
+  });
+
+  it("no cuenta el fin de cursos de actividades extraescolares (terminan antes)", () => {
+    const texto =
+      "PERIODO: AGOSTO-DICIEMBRE 2026  Fin de cursos de Actividades Extraescolares  04 de diciembre  75  Fin de clases  11 de diciembre";
+    const fin = extraerFinDeClases(texto);
+
+    expect(fin).toEqual(new Date(2026, 11, 11));
+  });
+
+  it("no le aplica la regla +1 año del inicio de labores (el fin de clases es del propio periodo)", () => {
+    const texto = "PERIODO: ENERO-JULIO 2026  Fin de clases 29 de mayo 2026";
+    const fin = extraerFinDeClases(texto);
+
+    expect(fin).toEqual(new Date(2026, 4, 29));
+  });
+
+  it("sin fila de fin de clases devuelve null", () => {
+    expect(extraerFinDeClases("")).toBeNull();
+    expect(extraerFinDeClases("PERIODO: AGOSTO-DICIEMBRE 2026  4 Inicio de labores 03 agosto")).toBeNull();
   });
 });
 

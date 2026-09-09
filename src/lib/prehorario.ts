@@ -240,6 +240,23 @@ export async function obtenerPrehorarios(): Promise<ResultadoPrehorarios> {
   return parsePrehorarioListing(await response.text(), FETCH_URL);
 }
 
+export function esCalendario(archivo: string): boolean {
+  return /calendario/i.test(archivo);
+}
+
+/**
+ * Elige el calendario vigente del listado de documentos (`?C=M;O=D`, orden de
+ * modificación, más reciente primero): el primer archivio cuyo nombre contiene
+ * «calendario». Sin ventana de días: la cadencia de búsqueda la controla el
+ * chequeo (una consulta cada 7 días durante las vacaciones), no la antigüedad
+ * del archivo.
+ */
+export function elegirCalendario(
+  todos: readonly ArchivoListado[],
+): ArchivoListado | null {
+  return todos.find(entrada => esCalendario(entrada.archivo)) ?? null;
+}
+
 export interface CandidatoPrehorario {
   archivo: string;
   puntaje: number;
