@@ -74,6 +74,7 @@ export default async function handler(request: Request): Promise<Response> {
           error instanceof Error
             ? `${error.name}: ${error.message}`
             : String(error),
+        cause: error,
         upstream: upstreamUrl,
       },
       504,
