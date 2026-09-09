@@ -127,23 +127,57 @@ async function fetchUpstream(
   upstreamUrl: string,
   headers: Record<string, string>,
 ): Promise<Response> {
-  let ultimoError: unknown;
-  for (let attempt = 0; attempt < 1; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  const urls = [
+    upstreamUrl.replace(/^https:\/\//, "http://"),
+    upstreamUrl.replace(/^http:\/\//, "https://"),
+    upstreamUrl.replace(
+      /^https?:\/\/ith\.mx/,
+      "https://www.ith.mx",
+    ),
+  ];
+
+  const results = [];
+
+  for (const url of urls) {
+    const started = Date.now();
+
     try {
-      return await fetch(upstreamUrl, {
+      const response = await fetch(url, {
         method: "GET",
         headers,
-        signal: controller.signal,
+        signal: AbortSignal.timeout(10_000),
+        redirect: "manual",
+      });
+
+      results.push({
+        url,
+        ok: true,
+        status: response.status,
+        elapsed: `${Date.now() - started}ms`,
+        location: response.headers.get("location"),
+        contentType: response.headers.get("content-type"),
       });
     } catch (error) {
-      ultimoError = error;
-    } finally {
-      clearTimeout(timer);
+      results.push({
+        url,
+        ok: false,
+        elapsed: `${Date.now() - started}ms`,
+        error: error instanceof Error ? error.name : String(error),
+        message: error instanceof Error ? error.message : String(error),
+        cause:
+          error instanceof Error && error.cause
+            ? String(error.cause)
+            : undefined,
+      });
     }
   }
-  throw ultimoError;
+
+  return new Response(JSON.stringify(results, null, 2), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 }
 
 function corsHeaders(request: Request): Record<string, string> {
