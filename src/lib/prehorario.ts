@@ -64,9 +64,10 @@ export function interpretarFuenteCalendario(
  */
 export function parseCalendarioOficial(html: string): CalendarioOficial | null {
   const dom = new DOMParser().parseFromString(html, "text/html");
-  const fuentes = [
+  const Fuentes = [
     ...dom.querySelectorAll<HTMLEmbedElement>("embed[src$='.pdf']"),
     ...dom.querySelectorAll<HTMLAnchorElement>("ul.doc a[href$='.pdf']"),
+    ...dom.querySelectorAll<HTMLAnchorElement>("a[href$='.pdf']"),
   ]
     .map(element =>
       element instanceof HTMLAnchorElement
@@ -76,7 +77,7 @@ export function parseCalendarioOficial(html: string): CalendarioOficial | null {
     .filter((fuente): fuente is string => Boolean(fuente));
 
   let mejor: { oficial: CalendarioOficial; anio: number } | null = null;
-  for (const fuente of fuentes) {
+  for (const fuente of Fuentes) {
     const oficial = interpretarFuenteCalendario(fuente);
     if (!oficial) continue;
     const anio = extraerAnio(oficial.archivo) ?? -1;
@@ -85,7 +86,7 @@ export function parseCalendarioOficial(html: string): CalendarioOficial | null {
     }
   }
 
-  return mejor?.oficial ?? null;
+return mejor?.oficial ?? null;
 }
 
 export async function obtenerCalendarioOficial(): Promise<CalendarioOficial | null> {

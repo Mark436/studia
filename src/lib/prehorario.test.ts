@@ -99,10 +99,10 @@ describe("urlPrehorario", () => {
     expect(
       urlPrehorario("PREHORARIO_INGENIERIA_EN_SISTEMAS_COMPUTACIONALES_2026-2.pdf"),
     ).toBe(
-      "https://ith.mx/documentos/PREHORARIO_INGENIERIA_EN_SISTEMAS_COMPUTACIONALES_2026-2.pdf",
+      "/api/ith/documentos/PREHORARIO_INGENIERIA_EN_SISTEMAS_COMPUTACIONALES_2026-2.pdf",
     );
     expect(urlPrehorario("PREHORARIO X 2026-1.pdf")).toBe(
-      "https://ith.mx/documentos/PREHORARIO%20X%202026-1.pdf",
+      "/api/ith/documentos/PREHORARIO%20X%202026-1.pdf",
     );
   });
 });
@@ -331,7 +331,7 @@ describe("parseFechaModificacion", () => {
 describe("urlDocumento", () => {
   test("construye el URL canónico", () => {
     expect(urlDocumento("CALENDARIO_ESCOLAR_2026-2 v2.pdf")).toBe(
-      "https://ith.mx/documentos/CALENDARIO_ESCOLAR_2026-2%20v2.pdf",
+      "/api/ith/documentos/CALENDARIO_ESCOLAR_2026-2%20v2.pdf",
     );
   });
 });
