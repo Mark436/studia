@@ -15,6 +15,8 @@ import {
   shortenSubjectName,
 } from "../utils";
 
+const SUBJECT_PRIORITY_CLASS = "font-display font-bold text-on-surface";
+
 interface ScheduleCapsuleProps {
   meetings: readonly ResolvedMeeting[];
   /** Real clock instant driving every state (dev simulation included). */
@@ -152,7 +154,7 @@ export function ScheduleCapsule({
             </span>
             {notification.conclusion ? (
               <span
-                className={`${FLASH_ROW_IN} truncate text-capsule-body font-medium tabular-nums text-primary-strong`}
+                className={`${FLASH_ROW_IN} truncate text-capsule-body font-medium tabular-nums text-primary-strong/75`}
               >
                 {notification.conclusion}
               </span>
@@ -161,7 +163,7 @@ export function ScheduleCapsule({
         }
         minimizedExpanded={
           <span className="flex min-w-0 flex-col gap-capsule-gap leading-tight">
-            <span className="text-capsule-headline font-semibold text-on-surface">
+            <span className={SUBJECT_PRIORITY_CLASS}>
               {notification.title}
             </span>
             {notification.conclusion ? (
@@ -226,7 +228,7 @@ export function ScheduleCapsule({
               {headline}
             </span>
           ) : (
-            <span className="text-capsule-body font-semibold tabular-nums text-primary-strong">
+            <span className={SUBJECT_PRIORITY_CLASS}>
               {isTomorrow ? `mañana ${info.startsLabel}` : `nos vemos el ${dayName}`}
             </span>
           )
@@ -237,7 +239,7 @@ export function ScheduleCapsule({
               {headline}
             </span>
           ) : (
-            <span className="font-display text-capsule-title font-bold leading-tight text-on-surface">
+            <span className={SUBJECT_PRIORITY_CLASS}>
               {headline}
             </span>
           )
@@ -245,7 +247,7 @@ export function ScheduleCapsule({
         expanded={
           info === null ? null : (
             <span className="truncate text-capsule-body text-on-surface-variant">
-              <span className="font-semibold text-on-surface">
+              <span className={SUBJECT_PRIORITY_CLASS}>
                 {info.subjectName}
               </span>
               {classroomLabel !== null ? (
@@ -261,7 +263,7 @@ export function ScheduleCapsule({
     );
   }
 
-  if (state.kind === "in-class") {
+if (state.kind === "in-class") {
     const classroomLabel = formatClassroomLabel(state.classroom);
     const professorLabel = formatProfessorLabel(state.professor);
     return (
@@ -281,7 +283,7 @@ export function ScheduleCapsule({
                 </span>
               ) : null}
             </span>
-            <span className="max-w-capsule-line-sm truncate text-capsule-caption font-medium text-on-surface-variant">
+            <span className={SUBJECT_PRIORITY_CLASS}>
               {shortenSubjectName(state.subjectName)}
             </span>
           </span>
@@ -312,7 +314,7 @@ export function ScheduleCapsule({
     );
   }
 
-  const classroomLabel = formatClassroomLabel(state.classroom);
+const classroomLabel = formatClassroomLabel(state.classroom);
   const professorLabel = formatProfessorLabel(state.professor);
   return (
 <Capsule
@@ -329,7 +331,7 @@ export function ScheduleCapsule({
               </span>
             ) : null}
           </span>
-          <span className="max-w-capsule-line-sm truncate text-capsule-caption font-medium text-on-surface-variant">
+          <span className={SUBJECT_PRIORITY_CLASS}>
             {shortenSubjectName(state.subjectName)}
           </span>
         </span>
