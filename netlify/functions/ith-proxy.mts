@@ -1,11 +1,12 @@
 // Proxy hacia ith.mx para calendario y documentos (evita CORS en producción).
-// Solo permite GET a rutas específicas; nunca registra cuerpos ni almacena nada.
+// Solo permite GET/HEAD a rutas específicas; nunca registra cuerpos ni
+// almacena nada salvo la caché en memoria de HTML pequeño.
 
 const UPSTREAM_BASE_URL = "https://ith.mx";
 
 const ALLOWED_PREFIXES = ["/calendario-escolar.html", "/documentos/"];
 
-const UPSTREAM_TIMEOUT_MS = 8_000;
+const UPSTREAM_TIMEOUT_MS = 15_000;
 
 const CACHE_TTL_MS = {
   "/calendario-escolar.html": 60 * 60 * 1000,
@@ -28,9 +29,9 @@ export default async function handler(request: Request): Promise<Response> {
     return new Response(null, { status: 204, headers: corsHeaders(request) });
   }
 
-  if (request.method !== "GET") {
+  if (request.method !== "GET" && request.method !== "HEAD") {
     return jsonResponse(
-      { error: "Método no permitido. Solo GET." },
+      { error: "Método no permitido. Solo GET y HEAD." },
       405,
       request,
     );
@@ -59,20 +60,30 @@ export default async function handler(request: Request): Promise<Response> {
 
   // `url.search` importa: el listado de Apache se ordena con `?C=M;O=D` y ese
   // orden es la clave para desempatar entre candidatos de la misma carrera.
-  const upstream = await fetchUpstream(
-    `${UPSTREAM_BASE_URL}${path}${url.search}`,
-    {
-      "User-Agent": request.headers.get("user-agent") ?? "Studia/1.0",
-      Accept: path.endsWith(".html")
-        ? "text/html,application/xhtml+xml"
-        : "application/pdf,*/*",
-    },
-  );
+  const upstreamUrl = `${UPSTREAM_BASE_URL}${path}${url.search}`;
+  const upstream = await fetchUpstream(upstreamUrl, {
+    "User-Agent": request.headers.get("user-agent") ?? "Studia/1.0",
+    Accept: path.endsWith(".html")
+      ? "text/html,application/xhtml+xml"
+      : "application/pdf,*/*",
+  }).catch((error: unknown) => {
+    return jsonResponse(
+      {
+        error: "No se pudo contactar el servicio del instituto.",
+        detalle:
+          error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+        upstream: upstreamUrl,
+      },
+      504,
+      request,
+    );
+  });
 
   const contentType = upstream.headers.get("content-type") ?? "";
   const isHtml = contentType.includes("text/html");
   const isPdf = contentType.includes("application/pdf");
 
+  const upstreamLastModified = upstream.headers.get("last-modified");
   const responseHeaders: Record<string, string> = {
     "Content-Type":
       upstream.headers.get("content-type") ??
@@ -81,6 +92,7 @@ export default async function handler(request: Request): Promise<Response> {
         : isHtml
           ? "text/html"
           : "application/octet-stream"),
+    ...(upstreamLastModified ? { "Last-Modified": upstreamLastModified } : {}),
     ...corsHeaders(request),
   };
 
@@ -91,7 +103,7 @@ export default async function handler(request: Request): Promise<Response> {
         : "public, max-age=3600";
   }
 
-  if (upstream.ok && isHtml && ttlKey !== undefined) {
+  if (request.method === "GET" && upstream.ok && isHtml && ttlKey !== undefined) {
     const buffer = await upstream.arrayBuffer();
     cached.set(cacheKey, {
       status: upstream.status,
@@ -115,7 +127,8 @@ async function fetchUpstream(
   upstreamUrl: string,
   headers: Record<string, string>,
 ): Promise<Response> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  let ultimoError: unknown;
+  for (let attempt = 0; attempt < 1; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
     try {
@@ -124,21 +137,13 @@ async function fetchUpstream(
         headers,
         signal: controller.signal,
       });
-    } catch {
-      if (attempt === 1) {
-        return new Response(
-          "El servicio del instituto no respondió a tiempo.",
-          {
-            status: 504,
-            headers: { "Content-Type": "text/plain; charset=utf-8" },
-          },
-        );
-      }
+    } catch (error) {
+      ultimoError = error;
     } finally {
       clearTimeout(timer);
     }
   }
-  throw new Error("unreachable");
+  throw ultimoError;
 }
 
 function corsHeaders(request: Request): Record<string, string> {
@@ -147,7 +152,7 @@ function corsHeaders(request: Request): Record<string, string> {
 
   return {
     "Access-Control-Allow-Origin": origin === "null" ? "*" : origin,
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, User-Agent",
     Vary: "Origin",
   };
