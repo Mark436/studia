@@ -109,7 +109,7 @@ desaparecieron; la barra inferior orienta la sección.
 
 | Estado | Tono | Contenido minimizado |
 | --- | --- | --- |
-| En clase | acento | contador de horas y minutos + salón a la derecha; debajo el nombre corto de la materia |
+| En clase | acento | contador de horas y minutos + salón a la derecha; debajo el nombre resumido de la materia |
 | Próxima clase | neutro | contador de horas y minutos + salón; debajo materia resumida |
 | Por hoy terminaste / Sin clases hoy | neutro | "mañana HH:MM" o "nos vemos el {día}"; sin clases en la semana → mensaje calmado |
 | Evento académico | neutro | título del evento + conclusión; el detalle aparece al expandir |
@@ -118,9 +118,9 @@ El contador jerarquiza por tamaño (no por peso): la hora va grande y
 `font-semibold`, la unidad "h" fino; los minutos a la mitad del tamaño y la
 "m" más chiquita aún. El salón se muestra crudo ("LB-24"), sin prefijo, en su
 misma línea a la derecha de los números y en `font-medium`: el blanco sobre el
-glass ya lo hace resaltar. La materia debajo usa un nombre resumido que cabe
-si el real es largo (`shortenSubjectName`, umbral 12 caracteres) y nunca
-envuelve.
+glass ya lo hace resaltar. La materia debajo usa un nombre resumido al plano
+colapsado (`shortenSubjectName`, umbral 24 caracteres, ~2 palabras) que nunca
+envuelve; al expandir se revela el nombre **completo**.
 
 ### Expandido de clase (estado "En clase")
 

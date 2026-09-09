@@ -37,7 +37,8 @@ Minimizado:
 - Línea 1: contador de horas/minutos + **salón a la derecha de los números**
   (crudo, sin prefijo).
 - Línea 2: **materia en texto chico resumida** (`shortenSubjectName`, umbral
-  12 caracteres) que nunca envuelve.
+  24 caracteres, ~2 palabras) que nunca envuelve. Al expandir se revela el
+  nombre completo.
 
 Expandido (`stacked`):
 - Mismo contenido y misma distribución, en la **variante tipográfica grande**
@@ -133,9 +134,9 @@ Aparece mientras `inicio ≤ ahora < fin`. Lleva `progressPercent` (anillo).
   todo `primary-strong`, `tabular-nums`; escala propia `--text-capsule-num-*`)
   + **salón crudo** a la derecha en la misma línea (`items-baseline
   gap-capsule-gap`, `text-capsule-body font-medium text-on-surface`).
-- Línea 2 — materia resumida (`shortenSubjectName`, umbral 12),
+- Línea 2 — materia resumida (`shortenSubjectName`, umbral 24),
   `text-capsule-caption font-medium text-on-surface-variant`,
-  `max-w-capsule-line-sm truncate` (nunca envuelve).
+  `truncate` (nunca envuelve). Al expandir se muestra la materia completa.
 
 **Desplegado (`stacked`):**
 - Ancla en variante tipográfica grande (`minimizedExpanded`, layout real,
@@ -168,8 +169,9 @@ Aparece cuando no hay clase en curso y sí una futura hoy.
 **Plegado** — mismo formato que "En clase" (colores tal cual los establecidos):
 - Línea 1 — `DurationCounter` con `minutesUntil` + **salón**
   (`min-w-0 truncate text-capsule-body font-medium text-on-surface`).
-- Línea 2 — materia resumida (`shortenSubjectName`, umbral 12),
+- Línea 2 — materia resumida (`shortenSubjectName`, umbral 24),
   `text-capsule-caption font-medium text-on-surface-variant truncate`.
+  Al expandir se revela el nombre completo.
 
 **Desplegado (`stacked`)** — sigue el diseño de clase en curso:
 - Línea 1 — `DurationCounter` `lg` con `minutesUntil` + salón

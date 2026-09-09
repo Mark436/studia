@@ -283,7 +283,7 @@ if (state.kind === "in-class") {
                 </span>
               ) : null}
             </span>
-            <span className={SUBJECT_PRIORITY_CLASS}>
+            <span className={`${SUBJECT_PRIORITY_CLASS} truncate`}>
               {shortenSubjectName(state.subjectName)}
             </span>
           </span>
@@ -298,7 +298,7 @@ if (state.kind === "in-class") {
                 </span>
               ) : null}
             </span>
-            <span className="motion-safe:animate-[studia-capsule-in_0.35s_var(--ease-out-soft)] truncate text-capsule-body font-medium text-on-surface">
+            <span className="motion-safe:animate-[studia-capsule-in_0.35s_var(--ease-out-soft)] whitespace-nowrap overflow-hidden text-capsule-body font-medium text-on-surface">
               {state.subjectName}
             </span>
           </span>
@@ -331,7 +331,7 @@ const classroomLabel = formatClassroomLabel(state.classroom);
               </span>
             ) : null}
           </span>
-          <span className={SUBJECT_PRIORITY_CLASS}>
+          <span className={`${SUBJECT_PRIORITY_CLASS} truncate`}>
             {shortenSubjectName(state.subjectName)}
           </span>
         </span>

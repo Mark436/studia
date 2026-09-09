@@ -5,6 +5,28 @@ const UPSTREAM_BASE_URL = "https://ith.mx";
 
 const ALLOWED_PREFIXES = ["/calendario-escolar.html", "/documentos/"];
 
+// El instituto a veces tarda mucho en responder o tira conexiones desde el
+// datacenter de Netlify. Se aborta antes del tope del gateway (que corta a
+// ~10 s) y se reintenta una vez para cubrir fallos transitorios de conexión.
+const UPSTREAM_TIMEOUT_MS = 8_000;
+
+// La página del calendario y el listado de documentos cambian poco y el
+// chequeo diario vuelve a pedirlos seguido: se cachean en memoria mientras
+// viva la instancia y el navegador reutiliza la respuesta con Cache-Control.
+const CACHE_TTL_MS = {
+  "/calendario-escolar.html": 60 * 60 * 1000,
+  "/documentos/": 10 * 60 * 1000,
+} as const;
+
+interface CacheEntry {
+  status: number;
+  headers: Record<string, string>;
+  body: ArrayBuffer;
+  expiresAt: number;
+}
+
+const cached = new Map<string, CacheEntry>();
+
 export const config = { path: "/api/ith/:path*" };
 
 export default async function handler(request: Request): Promise<Response> {
@@ -31,44 +53,90 @@ export default async function handler(request: Request): Promise<Response> {
     );
   }
 
-  try {
-    const upstream = await fetch(`${UPSTREAM_BASE_URL}${path}`, {
-      method: "GET",
-      headers: {
-        "User-Agent": request.headers.get("user-agent") ?? "Studia/1.0",
-        Accept:
-          path.endsWith(".html")
-            ? "text/html,application/xhtml+xml"
-            : "application/pdf,*/*",
-      },
+  const ttlKey = Object.keys(CACHE_TTL_MS).find((prefix) =>
+    path.startsWith(prefix),
+  ) as keyof typeof CACHE_TTL_MS | undefined;
+
+  // Caché en memoria de respuestas HTML pequeñas (calendario / listado).
+  const cacheKey = `${path}${url.search}`;
+  const entry = ttlKey === undefined ? undefined : cached.get(cacheKey);
+  if (entry && entry.expiresAt > Date.now()) {
+    return new Response(entry.body, {
+      status: entry.status,
+      headers: { ...entry.headers, ...corsHeaders(request) },
     });
+  }
 
-    const contentType = upstream.headers.get("content-type") ?? "";
-    const isHtml = contentType.includes("text/html");
-    const isPdf = contentType.includes("application/pdf");
+  // `url.search` importa: el listado de Apache se ordena con `?C=M;O=D` y ese
+  // orden es la clave para desempatar entre candidatos de la misma carrera.
+  const upstream = await fetchUpstream(
+    `${UPSTREAM_BASE_URL}${path}${url.search}`,
+    {
+      "User-Agent": request.headers.get("user-agent") ?? "Studia/1.0",
+      Accept: path.endsWith(".html")
+        ? "text/html,application/xhtml+xml"
+        : "application/pdf,*/*",
+    },
+  );
 
-    const responseHeaders: Record<string, string> = {
-      "Content-Type":
-        upstream.headers.get("content-type") ??
-        (isPdf ? "application/pdf" : isHtml ? "text/html" : "application/octet-stream"),
-      ...corsHeaders(request),
-    };
+  const contentType = upstream.headers.get("content-type") ?? "";
+  const isHtml = contentType.includes("text/html");
+  const isPdf = contentType.includes("application/pdf");
 
-    if (!isHtml && !isPdf) {
-      responseHeaders["Cache-Control"] = "public, max-age=3600";
-    }
+  const responseHeaders: Record<string, string> = {
+    "Content-Type": upstream.headers.get("content-type") ??
+      (isPdf ? "application/pdf" : isHtml ? "text/html" : "application/octet-stream"),
+    ...corsHeaders(request),
+  };
 
-    return new Response(upstream.body, {
+  if (upstream.ok) {
+    responseHeaders["Cache-Control"] =
+      isHtml || isPdf
+        ? "public, max-age=300, stale-while-revalidate=3600"
+        : "public, max-age=3600";
+  }
+
+  if (upstream.ok && isHtml && ttlKey !== undefined) {
+    const buffer = await upstream.arrayBuffer();
+    cached.set(cacheKey, {
+      status: upstream.status,
+      headers: responseHeaders,
+      body: buffer,
+      expiresAt: Date.now() + CACHE_TTL_MS[ttlKey],
+    });
+    return new Response(buffer, {
       status: upstream.status,
       headers: responseHeaders,
     });
-  } catch {
-    return jsonResponse(
-      { error: "No se pudo contactar el servicio del instituto." },
-      502,
-      request,
-    );
   }
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: responseHeaders,
+  });
+}
+
+async function fetchUpstream(
+  upstreamUrl: string,
+  headers: Record<string, string>,
+): Promise<Response> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+    try {
+      return await fetch(upstreamUrl, { method: "GET", headers, signal: controller.signal });
+    } catch {
+      if (attempt === 1) {
+        return new Response("El servicio del instituto no respondió a tiempo.", {
+          status: 504,
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error("unreachable");
 }
 
 function corsHeaders(request: Request): Record<string, string> {
