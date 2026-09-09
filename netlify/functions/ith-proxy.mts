@@ -6,7 +6,7 @@ const UPSTREAM_BASE_URL = "https://ith.mx";
 
 const ALLOWED_PREFIXES = ["/calendario-escolar.html", "/documentos/"];
 
-const UPSTREAM_TIMEOUT_MS = 15_000;
+//const UPSTREAM_TIMEOUT_MS = 15_000;
 
 const CACHE_TTL_MS = {
   "/calendario-escolar.html": 60 * 60 * 1000,
