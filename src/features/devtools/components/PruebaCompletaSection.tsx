@@ -185,6 +185,29 @@ export function PruebaCompletaSection({
     }
   }
 
+  async function reintentarCalendarioSinProxy() {
+    setCorriendo(true);
+    actualizarPaso("calendarioOficial", { estado: "running", error: null });
+    const t1 = performance.now();
+    try {
+      const oficial = await obtenerCalendarioOficial(true);
+      actualizarPaso("calendarioOficial", {
+        estado: oficial ? "success" : "error",
+        datos: oficial ?? null,
+        error: oficial ? null : "No se pudo obtener el calendario oficial",
+        duracionMs: performance.now() - t1,
+      });
+    } catch (error) {
+      actualizarPaso("calendarioOficial", {
+        estado: "error",
+        error: error instanceof Error ? error.message : "Error desconocido",
+        duracionMs: performance.now() - t1,
+      });
+    } finally {
+      setCorriendo(false);
+    }
+  }
+
   function formatearHorario(horario: Record<string, string[]>): string {
     const dias = ["lunes", "martes", "miercoles", "jueves", "viernes"] as const;
     return dias
@@ -200,6 +223,7 @@ export function PruebaCompletaSection({
     titulo: string,
     paso: PasoResultado<T>,
     renderDetalle?: (datos: T) => React.ReactNode,
+    acciones?: React.ReactNode,
   ) {
     const iconos = {
       idle: "⏳",
@@ -226,6 +250,7 @@ export function PruebaCompletaSection({
         {paso.error && (
           <p className="text-sm text-error ml-5">{paso.error}</p>
         )}
+        {paso.estado === "error" && acciones}
         {paso.datos && renderDetalle && (
           <div className="ml-5 text-xs text-on-surface-variant font-mono whitespace-pre-wrap">
             {renderDetalle(paso.datos)}
@@ -255,6 +280,16 @@ export function PruebaCompletaSection({
           "1. Calendario oficial",
           state.calendarioOficial,
           (d) => `Archivo: ${d.archivo}\nURL: ${d.url}`,
+          state.calendarioOficial.estado === "error" ? (
+            <Button
+              variant="secondary"
+              onClick={reintentarCalendarioSinProxy}
+              disabled={corriendo}
+              className="ml-5 w-fit"
+            >
+              Reintentar sin proxy
+            </Button>
+          ) : undefined,
         )}
         {renderPaso(
           "2. Fechas del calendario (PDF)",

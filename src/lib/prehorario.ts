@@ -24,6 +24,7 @@ const SITIO_ITH = "https://ith.mx/";
 // El webmaster del ITH publica el calendario oficial vigente incrustado en
 // esta página (`<embed src>` y/o `<ul class="doc"><a href>`).
 const CALENDARIO_OFICIAL_URL = "/api/ith/calendario-escolar.html";
+const CALENDARIO_DIRECT_URL = "https://ith.mx/calendario-escolar.html";
 
 export function extraerAnio(archivo: string): number | null {
   const match = archivo.match(/20\d{2}/);
@@ -89,8 +90,11 @@ export function parseCalendarioOficial(html: string): CalendarioOficial | null {
 return mejor?.oficial ?? null;
 }
 
-export async function obtenerCalendarioOficial(): Promise<CalendarioOficial | null> {
-  const response = await fetch(CALENDARIO_OFICIAL_URL);
+export async function obtenerCalendarioOficial(
+  direct = false,
+): Promise<CalendarioOficial | null> {
+  const url = direct ? CALENDARIO_DIRECT_URL : CALENDARIO_OFICIAL_URL;
+  const response = await fetch(url);
 
   return response.ok ? parseCalendarioOficial(await response.text()) : null;
 }

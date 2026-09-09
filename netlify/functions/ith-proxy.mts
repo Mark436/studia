@@ -5,14 +5,8 @@ const UPSTREAM_BASE_URL = "https://ith.mx";
 
 const ALLOWED_PREFIXES = ["/calendario-escolar.html", "/documentos/"];
 
-// El instituto a veces tarda mucho en responder o tira conexiones desde el
-// datacenter de Netlify. Se aborta antes del tope del gateway (que corta a
-// ~10 s) y se reintenta una vez para cubrir fallos transitorios de conexión.
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
-// La página del calendario y el listado de documentos cambian poco y el
-// chequeo diario vuelve a pedirlos seguido: se cachean en memoria mientras
-// viva la instancia y el navegador reutiliza la respuesta con Cache-Control.
 const CACHE_TTL_MS = {
   "/calendario-escolar.html": 60 * 60 * 1000,
   "/documentos/": 10 * 60 * 1000,
@@ -46,11 +40,7 @@ export default async function handler(request: Request): Promise<Response> {
   const path = url.pathname.replace(/^\/api\/ith/, "");
 
   if (!ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix))) {
-    return jsonResponse(
-      { error: "Ruta no permitida." },
-      403,
-      request,
-    );
+    return jsonResponse({ error: "Ruta no permitida." }, 403, request);
   }
 
   const ttlKey = Object.keys(CACHE_TTL_MS).find((prefix) =>
@@ -84,8 +74,13 @@ export default async function handler(request: Request): Promise<Response> {
   const isPdf = contentType.includes("application/pdf");
 
   const responseHeaders: Record<string, string> = {
-    "Content-Type": upstream.headers.get("content-type") ??
-      (isPdf ? "application/pdf" : isHtml ? "text/html" : "application/octet-stream"),
+    "Content-Type":
+      upstream.headers.get("content-type") ??
+      (isPdf
+        ? "application/pdf"
+        : isHtml
+          ? "text/html"
+          : "application/octet-stream"),
     ...corsHeaders(request),
   };
 
@@ -124,13 +119,20 @@ async function fetchUpstream(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
     try {
-      return await fetch(upstreamUrl, { method: "GET", headers, signal: controller.signal });
+      return await fetch(upstreamUrl, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+      });
     } catch {
       if (attempt === 1) {
-        return new Response("El servicio del instituto no respondió a tiempo.", {
-          status: 504,
-          headers: { "Content-Type": "text/plain; charset=utf-8" },
-        });
+        return new Response(
+          "El servicio del instituto no respondió a tiempo.",
+          {
+            status: 504,
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          },
+        );
       }
     } finally {
       clearTimeout(timer);
