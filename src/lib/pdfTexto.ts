@@ -7,16 +7,15 @@
 // pdfjs v6 crea el worker como módulo (`new Worker(src, { type: "module" })`);
 // la ruta cruda del paquete (`?url`) no se sirve bien en dev.
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?worker&url";
+import { fetchConReintento } from "@/lib/fetchConReintento";
 
 /**
  * URL para descargar un PDF del repositorio del instituto (calendario,
- * prehorario, programación, …): en dev y producción pasa por el proxy
- * de Netlify Function `/api/ith/` para evitar CORS.
+ * prehorario, programación, …). `api.marcosochoa.dev` replica el repositorio
+ * de `ith.mx` con CORS habilitado, así que no hace falta proxy.
  */
 export function urlDocumentoPdf(archivo: string): string {
-  const ruta = `/documentos/${encodeURIComponent(archivo)}`;
-
-  return `/api/ith${ruta}`;
+  return `https://api.marcosochoa.dev/ith/documentos/${encodeURIComponent(archivo)}`;
 }
 
 /**
@@ -28,7 +27,7 @@ export async function leerTextoPDF(url: string): Promise<string> {
   const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
   GlobalWorkerOptions.workerSrc = workerUrl;
 
-  const response = await fetch(url);
+  const response = await fetchConReintento(url);
   if (!response.ok) {
     throw new Error(`Error HTTP: ${response.status}`);
   }
@@ -76,7 +75,7 @@ export async function leerRenglonesPDF(url: string): Promise<PaginaRenglones[]> 
   const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
   GlobalWorkerOptions.workerSrc = workerUrl;
 
-  const response = await fetch(url);
+  const response = await fetchConReintento(url);
   if (!response.ok) {
     throw new Error(`Error HTTP: ${response.status}`);
   }

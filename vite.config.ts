@@ -23,19 +23,6 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path.replace(/^\/api\/sith/, ""),
       },
-      "/api/ith": {
-        target: "https://ith.mx",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/ith/, ""),
-      },
-      "/documentos": {
-        target: "https://ith.mx",
-        changeOrigin: true,
-      },
-      "/calendario-escolar.html": {
-        target: "https://ith.mx",
-        changeOrigin: true,
-      },
     },
   },
   plugins: [

@@ -1,3 +1,5 @@
+import { fetchConReintento } from "@/lib/fetchConReintento";
+
 export interface ArchivoListado {
   archivo: string;
   modificado: Date | null;
@@ -15,8 +17,8 @@ export interface ResultadoPrehorarios {
   todos?: ArchivoListado[];
 }
 
-// URL para fetch (proxy en producción, proxy de Vite en dev).
-const FETCH_URL = "/api/ith/documentos/?C=M;O=D";
+const ITH_API_BASE = "https://api.marcosochoa.dev/ith";
+const FETCH_URL = `${ITH_API_BASE}/documentos/?C=M;O=D`;
 
 export function extraerAnio(archivo: string): number | null {
   const match = archivo.match(/20\d{2}/);
@@ -29,7 +31,7 @@ export function esPrehorario(archivo: string): boolean {
 }
 
 export function urlDocumento(archivo: string): string {
-  return `/api/ith/documentos/${encodeURIComponent(archivo)}`;
+  return `${ITH_API_BASE}/documentos/${encodeURIComponent(archivo)}`;
 }
 
 export function urlPrehorario(archivo: string): string {
@@ -160,7 +162,7 @@ export function parsePrehorarioListing(
 }
 
 export async function obtenerPrehorarios(): Promise<ResultadoPrehorarios> {
-  const response = await fetch(FETCH_URL);
+  const response = await fetchConReintento(FETCH_URL);
 
   if (!response.ok) {
     throw new Error(`Error HTTP: ${response.status}`);

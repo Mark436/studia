@@ -497,14 +497,17 @@ antes de la inscripción.
     **no** sufre esa regla (siempre está en el primer mes del periodo).
   - `parseCalendarioOficial` elige el **calendario vigente** (mayor año) cuando
     la página embebe varios PDFs.
-- [ ] **Transporte en producción pendiente (diagnóstico 2026-08)**: el proxy de
-  Netlify `netlify/functions/ith-proxy.mts` (único que añadía `Access-Control-Allow-Origin`
-  y reenviaba `Last-Modified` para acceder al calendario/listado desde el
-  navegador) queda en 504 porque **`ith.mx` es inalcanzable desde el datacenter
-  de Netlify** (ETIMEDOUT; sin ruta de red mexicana). La búsqueda por listado en
-  vacaciones solo funcionará donde el fetch llegue (dev/vite o cuando haya
-  ruta). Sin CORS/relay, `ith.mx/calendario-escolar.html` y `documentos/`
-  bloqueados en producción. Revisitar la decisión de transporte.
+- [x] **Transporte resuelto (diagnóstico 2026-08 → espejo 2026-09)**: `ith.mx`
+  es inalcanzable desde el datacenter de Netlify (ETIMEDOUT), pero el repositorio
+  completo (`/documentos/` con CORS y `?C=M;O=D`, PDFs, y
+  `ith.mx/calendario-escolar.html`) está espejado en
+  `https://api.marcosochoa.dev/ith/`. Se eliminaron el proxy
+  `netlify/functions/ith-proxy.mts` y las rutas `/api/ith`, `/documentos` y
+  `/calendario-escolar.html` de `vite.config.ts`; `prehorario.ts` y
+  `pdfTexto.ts` apuntan directo al espejo. No hace falta relay en producción.
+  El espejo limita a 30 peticiones por usuario cada 10 s (HTTP 429): los fetch
+  de listado y PDF pasan por `fetchConReintento` (`src/lib/fetchConReintento.ts`),
+  que ante un 429 espera `Retry-After` (o 10 s) y re-intenta hasta 3 intentos.
 
 - [x] **Lectura de PDF separada del calendario**: `leerTextoPDF` /
   `urlDocumentoPdf` viven en `src/lib/pdfTexto.ts` (worker de pdf.js), sin
