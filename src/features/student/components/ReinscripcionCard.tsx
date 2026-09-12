@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/Card";
+import { useClock } from "@/lib/devtest/provider";
 import type { Alumno } from "@/lib/api/client";
-import { getNow } from "@/lib/devtools/clock";
 import { getTimeUntilReinscripcion } from "@/lib/notifications/reinscripcion";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("es-MX", {
@@ -25,7 +25,8 @@ function formatRemaining(days: number, hours: number, minutes: number): string {
 }
 
 export function ReinscripcionCard({ alumno }: { alumno: Alumno | null }) {
-  const time = getTimeUntilReinscripcion(alumno, getNow());
+  const clock = useClock();
+  const time = getTimeUntilReinscripcion(alumno, clock.getNow());
 
   if (time.status === "no-date" || time.status === "past") return null;
 

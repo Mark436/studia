@@ -20,6 +20,74 @@ export interface ResultadoPrehorarios {
 const ITH_API_BASE = "https://api.marcosochoa.dev/ith";
 const FETCH_URL = `${ITH_API_BASE}/documentos/?C=M;O=D`;
 
+/**
+ * Página oficial donde el webmaster publica el calendario vigente incrustado
+ * (`<embed src>` y/o `<ul class="doc"><a href>`). El mirror replica la página
+ * de `ith.mx` y sirve también los PDFs de `documentos/` en el mismo origin.
+ */
+const CALENDARIO_OFICIAL_URL = `${ITH_API_BASE}/calendario-escolar.html`;
+
+export interface CalendarioOficial {
+  archivo: string;
+  url: string;
+}
+
+/**
+ * Convierte la ruta que apunta la página `calendario-escolar.html` (relativa
+ * tipo "documentos/CALENDARIO…pdf" o absoluta) en el archivo + URL canónica.
+ * Las rutas relativas se resuelven contra la propia página oficial en el
+ * mirror; fuera de ese origin o sin extensión `.pdf` no se acepta.
+ */
+export function interpretarFuenteCalendario(
+  fuente: string,
+): CalendarioOficial | null {
+  const archivo = extraerNombreArchivo(fuente, CALENDARIO_OFICIAL_URL);
+  if (!archivo || !/\.pdf$/i.test(archivo)) return null;
+
+  const url = new URL(fuente, CALENDARIO_OFICIAL_URL);
+  if (url.origin !== new URL(CALENDARIO_OFICIAL_URL).origin) return null;
+
+  return { archivo, url: url.href };
+}
+
+/**
+ * La página embebe a veces varios calendarios (uno por periodo). Se escoge el
+ * vigente: el que tiene el año más alto en el nombre (desempate: primero en la
+ * página).
+ */
+export function parseCalendarioOficial(html: string): CalendarioOficial | null {
+  const dom = new DOMParser().parseFromString(html, "text/html");
+  const fuentes = [
+    ...dom.querySelectorAll<HTMLEmbedElement>("embed[src$='.pdf']"),
+    ...dom.querySelectorAll<HTMLAnchorElement>("ul.doc a[href$='.pdf']"),
+    ...dom.querySelectorAll<HTMLAnchorElement>("a[href$='.pdf']"),
+  ]
+    .map(element =>
+      element instanceof HTMLAnchorElement
+        ? element.getAttribute("href")
+        : element.getAttribute("src"),
+    )
+    .filter((fuente): fuente is string => Boolean(fuente));
+
+  let mejor: { oficial: CalendarioOficial; anio: number } | null = null;
+  for (const fuente of fuentes) {
+    const oficial = interpretarFuenteCalendario(fuente);
+    if (!oficial) continue;
+    const anio = extraerAnio(oficial.archivo) ?? -1;
+    if (!mejor || anio > mejor.anio) {
+      mejor = { oficial, anio };
+    }
+  }
+
+  return mejor?.oficial ?? null;
+}
+
+export async function obtenerCalendarioOficial(): Promise<CalendarioOficial | null> {
+  const response = await fetchConReintento(CALENDARIO_OFICIAL_URL);
+
+  return response.ok ? parseCalendarioOficial(await response.text()) : null;
+}
+
 export function extraerAnio(archivo: string): number | null {
   const match = archivo.match(/20\d{2}/);
 
@@ -169,23 +237,6 @@ export async function obtenerPrehorarios(): Promise<ResultadoPrehorarios> {
   }
 
   return parsePrehorarioListing(await response.text(), FETCH_URL);
-}
-
-export function esCalendario(archivo: string): boolean {
-  return /calendario/i.test(archivo);
-}
-
-/**
- * Elige el calendario vigente del listado de documentos (`?C=M;O=D`, orden de
- * modificación, más reciente primero): el primer archivio cuyo nombre contiene
- * «calendario». Sin ventana de días: la cadencia de búsqueda la controla el
- * chequeo (una consulta cada 7 días durante las vacaciones), no la antigüedad
- * del archivo.
- */
-export function elegirCalendario(
-  todos: readonly ArchivoListado[],
-): ArchivoListado | null {
-  return todos.find(entrada => esCalendario(entrada.archivo)) ?? null;
 }
 
 export interface CandidatoPrehorario {

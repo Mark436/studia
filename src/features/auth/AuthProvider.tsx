@@ -35,8 +35,11 @@ import {
 } from "@/lib/storage/settingsStore";
 import type { AuthStatus } from "./auth-context";
 import { AuthContext } from "./auth-context";
+import { useSithApi, useClock } from "@/lib/devtest/provider";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const sithApi = useSithApi();
+  const clock = useClock();
   const [status, setStatus] = useState<AuthStatus>("restoring");
   const [pendingAuth, setPendingAuth] = useState(false);
   const [alumno, setAlumno] = useState<Alumno | null>(null);
@@ -160,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setPendingAuth(true);
     try {
-      const data = await fetchAppData({ user, pass });
+      const data = await fetchAppData({ user, pass }, sithApi);
       credentialsRef.current = { user, pass };
       const previousAlumno = await loadPreviousAlumno();
       setHasCredentials(true);
@@ -170,10 +173,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus("authenticated");
       // Marks when this session's credentials were entered; the shell uses
       // it for the stale-data nudge (~23h). Refreshes never rewrite it.
-      void setSetting(SETTING_LAST_LOGIN_AT, new Date().toISOString()).catch(
+      void setSetting(SETTING_LAST_LOGIN_AT, clock.getNow().toISOString()).catch(
         () => undefined,
       );
-      void persistSession(previousAlumno, data.alumno, data.avisos, user).then(
+      void persistSession(previousAlumno, data.alumno, data.avisos, user, clock.getNow()).then(
         handlePersistResult,
       );
       return true;
@@ -184,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setPendingAuth(false);
     }
-  }, [handlePersistResult]);
+  }, [handlePersistResult, sithApi, clock]);
 
   // Same load path as login (fetch → persist → adeudo alert) but without the
   // "authenticating" status: cached data stays visible while refreshing and a
@@ -196,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshingRef.current = true;
     setRefreshing(true);
     try {
-      const data = await fetchAppData(credentials);
+      const data = await fetchAppData(credentials, sithApi);
       const previousAlumno = await loadPreviousAlumno();
       setAlumno(data.alumno);
       setAvisos(data.avisos);
@@ -205,6 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data.alumno,
         data.avisos,
         credentials.user,
+        clock.getNow(),
       ).then(handlePersistResult);
       return true;
     } catch {
@@ -213,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshingRef.current = false;
       setRefreshing(false);
     }
-  }, [handlePersistResult]);
+  }, [handlePersistResult, sithApi, clock]);
 
   const markGradesSeen = useCallback(() => {
     setUnseenGradeChanges(false);
@@ -290,29 +294,30 @@ async function loadPreviousAlumno(): Promise<Alumno | null> {
 }
 
 // Persistence is fire-and-forget: a storage failure never blocks the session,
-// and adeudo alerts compare against what was known before this fetch.
-async function persistSession(
-  previousAlumno: Alumno | null,
-  alumno: Alumno,
-  avisos: Aviso[],
-  user: string,
-): Promise<{
-  hasChanges: boolean;
-  newAdeudo: boolean;
-  progressGain: number;
-  reinscripcionAlert: ReinscripcionAlertOutcome;
-}> {
-  let hasChanges = false;
-  try {
-    const tracking = await loadGradeTracking();
-    const merged = mergeGradeTracking(tracking, alumno.boleta.materias);
-    hasChanges = merged.hasChanges;
-    await saveGradeTracking(merged.tracking);
-    await saveAppData({
-      alumno,
-      avisos,
-      loadedAt: new Date().toISOString(),
-    });
+ // and adeudo alerts compare against what was known before this fetch.
+ async function persistSession(
+   previousAlumno: Alumno | null,
+   alumno: Alumno,
+   avisos: Aviso[],
+   user: string,
+   now: Date,
+ ): Promise<{
+   hasChanges: boolean;
+   newAdeudo: boolean;
+   progressGain: number;
+   reinscripcionAlert: ReinscripcionAlertOutcome;
+ }> {
+   let hasChanges = false;
+   try {
+     const tracking = await loadGradeTracking();
+     const merged = mergeGradeTracking(tracking, alumno.boleta.materias);
+     hasChanges = merged.hasChanges;
+     await saveGradeTracking(merged.tracking);
+     await saveAppData({
+       alumno,
+       avisos,
+       loadedAt: now.toISOString(),
+     });
     // Remember the control number only if the user opted in; otherwise clear
     // it so future logins start blank. Default is "not remembered".
     const rememberRaw = await getSetting(SETTING_REMEMBER_USERNAME).catch(
@@ -335,6 +340,7 @@ async function persistSession(
   const reinscripcionAlert = await notifyNewReinscripcion(
     previousAlumno,
     alumno,
+    now,
   );
   return { hasChanges, newAdeudo, progressGain, reinscripcionAlert };
 }

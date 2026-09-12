@@ -8,13 +8,14 @@
 // El calendario del ciclo siguiente se rastrea durante las vacaciones de fin
 // de clases: desde el último día de clases del periodo en curso
 // (`fechaFinDeClases`) hasta el inicio de labores del siguiente
-// (`fechaInicioLabores`), consultando el listado de documentos a lo sumo cada
-// 7 días. Fuera de esa ventana el único calendario que entra es el que se
-// pide on-demand cuando faltan los datos.
+// (`fechaInicioLabores`), consultando la página oficial
+// `calendario-escolar.html` (`obtenerCalendarioOficial`) a lo sumo cada 7
+// días. Fuera de esa ventana el único calendario que entra es el que se pide
+// on-demand cuando faltan los datos.
 
 export const HORA_CHEQUEO = 18;
 
-/** Días que deben pasar entre consultas del listado buscando el calendario. */
+/** Días que deben pasar entre consultas a la página oficial buscando el calendario. */
 export const DIAS_ENTRE_BUSQUEDAS = 7;
 
 export interface ConfigChequeoHorarios {
@@ -32,7 +33,7 @@ export const CONFIG_CHEQUEO_HORARIOS: ConfigChequeoHorarios = {
 };
 
 export interface EstadoChequeoHorarios {
-  /** Último archivo de calendario detectado en el listado (pendiente o ya aplicado). */
+  /** Último calendario detectado en la página oficial (pendiente o ya aplicado). */
   calendarioVisto: string | null;
   /** Último archivo de calendario *aplicado* (del que vienen las fechas). */
   calendarioProcesado: string | null;
@@ -46,7 +47,7 @@ export interface EstadoChequeoHorarios {
   prehorarioVisto: string | null;
   /** Ya se avisó que el turno de reinscripción puede estar publicado. */
   avisoTurnosEnviado: boolean;
-  /** Última consulta del listado buscando calendario (ISO, cadencia 7 días). */
+  /** Última consulta a la página oficial buscando calendario (ISO, cadencia 7 días). */
   ultimaBusquedaCalendario: string | null;
 }
 
@@ -166,7 +167,7 @@ export function enVentanaVacacional(
   );
 }
 
-/** ¿Ya pasaron los `diasEntreBusquedas` desde la última consulta del listado? */
+/** ¿Ya pasaron los `diasEntreBusquedas` desde la última consulta del calendario? */
 export function pasoTiempoBusquedaCalendario(
   estado: EstadoChequeoHorarios,
   ahora: Date,

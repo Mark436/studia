@@ -25,6 +25,7 @@ export type {
   CalificacionMateria,
   Coordenadas,
   Credenciales,
+  DatosAlumno,
   ReticulaMateria,
 };
 
@@ -46,22 +47,37 @@ export class ApiError extends Error {
   }
 }
 
-function createSithClient(): SithClient {
-  const baseUrl = import.meta.env.VITE_API_URL?.trim();
-
-  return baseUrl ? new SithClient({ baseUrl }) : new SithClient();
+export interface SithApi {
+  fetchDatos(credentials: Credenciales): Promise<DatosAlumno>;
 }
 
-const sithClient = createSithClient();
+class RealSithApiImpl implements SithApi {
+  private client = (() => {
+    const baseUrl = import.meta.env.VITE_API_URL?.trim();
+    return baseUrl ? new SithClient({ baseUrl }) : new SithClient();
+  })();
+
+  async fetchDatos(credentials: Credenciales): Promise<DatosAlumno> {
+    try {
+      return await this.client.fetchDatos(credentials);
+    } catch (error) {
+      throw new ApiError(classifyError(error), { cause: error });
+    }
+  }
+}
+
+let defaultSithApi: SithApi = new RealSithApiImpl();
+
+export function setDefaultSithApi(api: SithApi): void {
+  defaultSithApi = api;
+}
 
 export async function fetchAppData(
   credentials: Credenciales,
+  sithApi?: SithApi,
 ): Promise<DatosAlumno> {
-  try {
-    return await sithClient.fetchDatos(credentials);
-  } catch (error) {
-    throw new ApiError(classifyError(error), { cause: error });
-  }
+  const api = sithApi ?? defaultSithApi;
+  return api.fetchDatos(credentials);
 }
 
 function classifyError(error: unknown): ApiErrorKind {

@@ -4,8 +4,8 @@ import { Card } from "@/components/ui/Card";
 import { PlusIcon } from "@/components/ui/icons";
 import { Spinner } from "@/components/ui/Spinner";
 import type { ToastVariant } from "@/components/ui/toastVariants";
-import { getNow } from "@/lib/devtools/clock";
 import { useCurrentTime } from "@/lib/devtools/useCurrentTime";
+import { useClock } from "@/lib/devtest/provider";
 import type { Alumno } from "@/lib/api/client";
 import { CUSTOM_CLAVE_PREFIX } from "@/lib/storage/scheduleEditsStore";
 import type { EditedField } from "@/lib/storage/scheduleEditsStore";
@@ -53,8 +53,9 @@ export function SchedulePage({
   onShowToast,
 }: SchedulePageProps) {
   const now = useCurrentTime();
+  const clock = useClock();
   const { edits: scheduleEdits, resolvedWeek } = useScheduleState();
-  const [selectedDate, setSelectedDate] = useState<Date>(() => getNow());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => clock.getNow());
   const [editor, setEditor] = useState<EditorState>({ mode: "closed" });
 
   const swipe = useHorizontalSwipe((direction) => {
@@ -138,7 +139,7 @@ export function SchedulePage({
       );
     } else {
       scheduleEdits.addCustomSubject({
-        clave: `${CUSTOM_CLAVE_PREFIX}${Date.now().toString(36)}`,
+        clave: `${CUSTOM_CLAVE_PREFIX}${clock.getNow().getTime().toString(36)}`,
         subjectName: submit.subjectName,
         classroom: submit.classroom,
         professor: submit.professor,
@@ -188,7 +189,7 @@ export function SchedulePage({
                 onClick={
                   isToday
                     ? () => setEditor({ mode: "create" })
-                    : () => setSelectedDate(getNow())
+                    : () => setSelectedDate(clock.getNow())
                 }
                 aria-label={isToday ? "Agregar materia" : "Volver a hoy"}
                 title={isToday ? "Agregar materia" : "Volver a hoy"}

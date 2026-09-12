@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { useClock } from "@/lib/devtest/provider";
 import type { Alumno } from "@/lib/api/client";
 import {
   CONFIG_CHEQUEO_HORARIOS,
@@ -12,13 +13,12 @@ import {
   tocaAvisarTurnosReinscripcion,
 } from "@/lib/busquedaHorarios";
 import type { EstadoChequeoHorarios } from "@/lib/busquedaHorarios";
-import { getNow } from "@/lib/devtools/clock";
 import { obtenerDatosCalendario } from "@/lib/datosCalendario";
 import { leerFechasInicioLabores } from "@/lib/calendarioLabores";
 import { urlDocumentoPdf } from "@/lib/pdfTexto";
 import {
-  elegirCalendario,
   elegirPrehorarioCarrera,
+  obtenerCalendarioOficial,
   obtenerPrehorarios,
 } from "@/lib/prehorario";
 import {
@@ -55,14 +55,15 @@ async function persistir(estado: EstadoChequeoHorarios): Promise<void> {
  * Anclado a las 18:00 (hora en la que el instituto ya sube los documentos), NO
  * contabiliza si «ya se chequeó»: cada vez que corre (app activa siendo 18:00
  * o después) vuelve a evaluar y solo actúa cuando toca. Dentro de las
- * vacaciones de fin de clases se busca el calendario del siguiente ciclo en el
- * listado, a lo sumo cada 7 días (cadencia `pasoTiempoBusquedaCalendario`).
- * Sin conexión no busca ni persiste nada; reactiva al recuperar la red. Usa
- * getNow() (el reloj del modo dev) para que las fechas se prueben con la hora
+ * vacaciones de fin de clases se busca el calendario del siguiente ciclo en la
+ * página oficial, a lo sumo cada 7 días (cadencia `pasoTiempoBusquedaCalendario`).
+ * Sin conexión no busca ni se persiste nada; reactiva al recuperar la red. Usa
+ * clock.getNow() (el reloj del modo dev) para que las fechas se prueben con la hora
  * simulada.
  */
 export async function ejecutarChequeoHorarios(
   alumno: Alumno | null,
+  clock: { getNow: () => Date },
   onResult?: (result: HorariosCheckResult) => void,
 ): Promise<void> {
   // Guard offline: sin conexión no se busca ni se persiste nada; el listener
@@ -74,7 +75,7 @@ export async function ejecutarChequeoHorarios(
 
   try {
     const estado = await cargarEstado();
-    const ahora = getNow();
+    const ahora = clock.getNow();
 
     if (!esHoraChequeo(ahora)) {
       onResult?.({ fase: "idle", mensaje: null });
@@ -86,7 +87,7 @@ export async function ejecutarChequeoHorarios(
     // cuándo hay vacaciones. Si falla, se reintenta en la próxima corrida.
     if (estado.fechaFinDeClases === null || estado.fechaInicioLabores === null) {
       try {
-        await obtenerDatosCalendario();
+        await obtenerDatosCalendario(clock);
       } catch (error) {
         console.error(
           "[horarios] error al obtener los datos del calendario:",
@@ -114,8 +115,8 @@ export async function ejecutarChequeoHorarios(
 
     switch (resultado.fase) {
       case "buscar-calendario": {
-        // Cadencia: durante las vacaciones el listado se consulta a lo sumo
-        // cada 7 días.
+        // Cadencia: durante las vacaciones la página oficial se consulta a lo
+        // sumo cada 7 días.
         if (!pasoTiempoBusquedaCalendario(estado, ahora, CONFIG_CHEQUEO_HORARIOS)) {
           onResult?.({ fase: "idle", mensaje: null });
           break;
@@ -125,14 +126,16 @@ export async function ejecutarChequeoHorarios(
         let detectado: string | null = null;
 
         try {
-          const listado = await obtenerPrehorarios();
-          const elegido = elegirCalendario(listado.todos ?? []);
-          if (elegido !== null && elegido.archivo !== estado.calendarioProcesado) {
-            detectado = elegido.archivo;
+          const oficial = await obtenerCalendarioOficial();
+          if (
+            oficial !== null &&
+            oficial.archivo !== estado.calendarioProcesado
+          ) {
+            detectado = oficial.archivo;
           }
         } catch (error) {
           console.error(
-            "[horarios] error al buscar el calendario en el listado:",
+            "[horarios] error al buscar el calendario en la página oficial:",
             error,
           );
         }
@@ -152,6 +155,7 @@ export async function ejecutarChequeoHorarios(
         if (!estado.calendarioVisto) break;
         const lectura = await leerFechasInicioLabores(
           urlDocumentoPdf(estado.calendarioVisto),
+          clock.getNow().getFullYear(),
         );
         if (
           lectura.fechas.length === 0 &&
@@ -210,16 +214,17 @@ export function useHorariosCheck(
   alumno: Alumno | null,
   onResult?: (result: HorariosCheckResult) => void,
 ): void {
+  const clock = useClock();
   const callbackRef = useRef(onResult);
   callbackRef.current = onResult;
 
   const runOnceRef = useRef(false);
 
   const disparar = useCallback(() => {
-    void ejecutarChequeoHorarios(alumno, result =>
+    void ejecutarChequeoHorarios(alumno, clock, result =>
       callbackRef.current?.(result),
     );
-  }, [alumno]);
+  }, [alumno, clock]);
 
   useEffect(() => {
     if (runOnceRef.current) return;
@@ -232,7 +237,7 @@ export function useHorariosCheck(
 
     function scheduleNext(): void {
       if (timer !== undefined) window.clearTimeout(timer);
-      const ahora = getNow();
+      const ahora = clock.getNow();
       const delay = Math.max(
         1000,
         proximoMomentoChequeo(ahora).getTime() - ahora.getTime(),
@@ -274,5 +279,5 @@ export function useHorariosCheck(
       window.removeEventListener("focus", handleForeground);
       window.removeEventListener("online", handleForeground);
     };
-  }, [disparar]);
+  }, [disparar, clock]);
 }

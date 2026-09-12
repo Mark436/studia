@@ -1,8 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-// Shared app timer (minute-boundary synced): the panel displays the same
-// notion of "now" as every screen instead of running its own interval.
-import { useCurrentTime } from "@/lib/devtools/useCurrentTime";
+import { useClock } from "@/lib/devtest/provider";
 import type { DevToolsController } from "../useDevConfig";
 
 const QUICK_OFFSETS: ReadonlyArray<readonly [label: string, minutes: number]> = [
@@ -29,7 +27,8 @@ function formatNow(date: Date): string {
 }
 
 export function ClockSection({ dev }: { dev: DevToolsController }) {
-  const now = useCurrentTime();
+  const clock = useClock();
+  const now = clock.getNow();
   const simulated = dev.config.clockOffsetMinutes !== null;
 
   function shiftOffset(deltaMinutes: number) {
@@ -45,7 +44,7 @@ export function ClockSection({ dev }: { dev: DevToolsController }) {
 
     dev.updateConfig((previous) => ({
       ...previous,
-      clockOffsetMinutes: Math.round((targetMs - Date.now()) / 60_000),
+      clockOffsetMinutes: Math.round((targetMs - clock.getNow().getTime()) / 60_000),
     }));
   }
 

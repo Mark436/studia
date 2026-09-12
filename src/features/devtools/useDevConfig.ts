@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { setClockOffsetMinutes } from "@/lib/devtools/clock";
+import { DevTestEnvironment } from "@/lib/devtest/environment";
 import {
   getSetting,
   removeSetting,
@@ -112,6 +112,8 @@ export function useDevConfig(): DevToolsController {
   const [enabled, setEnabled] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
+  const env = DevTestEnvironment;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -142,25 +144,27 @@ export function useDevConfig(): DevToolsController {
 
       const parsed = parseDevConfig(raw);
       setConfig(parsed);
-      setClockOffsetMinutes(parsed.clockOffsetMinutes);
       // Unset resolves per build type: dev builds show the panel, production
       // keeps it hidden until the tap gesture enables it.
-      setEnabled(enabledRaw === null ? isDevBuild() : enabledRaw === "true");
+      const shouldEnable = enabledRaw === null ? isDevBuild() : enabledRaw === "true";
+      setEnabled(shouldEnable);
+      if (shouldEnable) {
+        env.activate();
+      }
       setLoaded(true);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [env]);
 
-  // Persist and apply the clock offset on every post-load config change.
+  // Persist config on every post-load config change.
   useEffect(() => {
     if (!loaded) return;
     void saveDevConfig(config).catch((error: unknown) => {
       console.warn("No se pudo guardar la configuración de desarrollo.", error);
     });
-    setClockOffsetMinutes(config.clockOffsetMinutes);
   }, [config, loaded]);
 
   const updateConfig = useCallback(
@@ -172,24 +176,26 @@ export function useDevConfig(): DevToolsController {
 
   const resetConfig = useCallback(() => {
     setConfig(EMPTY_DEV_CONFIG);
+    env.reset();
     void removeSetting(SETTING_DEV_CONFIG).catch((error: unknown) => {
       console.warn("No se pudo borrar la configuración de desarrollo.", error);
     });
-  }, []);
+  }, [env]);
 
   const enable = useCallback(() => {
     setEnabled(true);
+    env.activate();
     void setSetting(SETTING_DEV_MODE_ENABLED, "true").catch(() => undefined);
-  }, []);
+  }, [env]);
 
   // Closing keeps the saved DevConfig (it re-applies on the next unlock) but
   // pauses all simulation immediately, since overrides only apply while the
   // panel is enabled.
   const disable = useCallback(() => {
     setEnabled(false);
-    setClockOffsetMinutes(null);
+    env.deactivate();
     void setSetting(SETTING_DEV_MODE_ENABLED, "false").catch(() => undefined);
-  }, []);
+  }, [env]);
 
   return { config, enabled, loaded, updateConfig, resetConfig, enable, disable };
 }

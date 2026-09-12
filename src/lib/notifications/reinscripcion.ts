@@ -1,5 +1,4 @@
 import type { Alumno } from "@/lib/api/client";
-import { getNow } from "@/lib/devtools/clock";
 import {
   getSetting,
   setSetting,
@@ -163,6 +162,7 @@ async function readAlertState(): Promise<ReinscripcionAlertState | null> {
 export async function notifyNewReinscripcion(
   previousAlumno: Alumno | null,
   nextAlumno: Alumno,
+  now: Date,
 ): Promise<ReinscripcionAlertOutcome> {
   const fecha = parseReinscripcionDate(nextAlumno);
   if (!fecha) return "none";
@@ -173,7 +173,7 @@ export async function notifyNewReinscripcion(
   const state = await readAlertState();
   const fired = state?.fechaIso === iso ? state.fired : [];
 
-  const alert = getReinscripcionAlert(previousIso, iso, getNow(), fired);
+  const alert = getReinscripcionAlert(previousIso, iso, now, fired);
   if (!alert) return "none";
 
   await showLocalReinscripcionPush(alert.kind);

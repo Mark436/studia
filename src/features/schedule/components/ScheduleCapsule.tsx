@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Capsule } from "@/components/ui/Capsule";
+import { useClock } from "@/lib/devtest/provider";
 import type { CapsuleNotification } from "@/lib/notifications/capsuleEvents";
 import type { ResolvedMeeting } from "../types";
 import {
@@ -112,6 +113,7 @@ export function ScheduleCapsule({
   notification = null,
   autoCollapseMs,
 }: ScheduleCapsuleProps) {
+  const clock = useClock();
   const state = buildCapsuleState(meetings, minutesOf(now));
 
   // Important-event detection across minute ticks. Each event id fires once;
@@ -131,8 +133,8 @@ export function ScheduleCapsule({
     if (firedEventsRef.current.has(eventKey)) return;
 
     firedEventsRef.current.add(eventKey);
-    setPulseKey(`${eventKey}:${Date.now()}`);
-  }, [currentTick]);
+    setPulseKey(`${eventKey}:${clock.getNow().getTime()}`);
+  }, [currentTick, clock]);
 
   // Notification flash: one coherent alert (title + conclusion visible while
   // collapsed; detail appears on expand). The pop announces the arrival while

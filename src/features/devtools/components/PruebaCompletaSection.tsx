@@ -5,11 +5,10 @@ import type { Alumno } from "@/lib/api/client";
 import { getMateriasDisponibles } from "@/features/student/reticulaPendiente";
 import { calcularSugerenciaHorario } from "@/lib/sugerirHorario";
 import {
-  elegirCalendario,
+  obtenerCalendarioOficial,
   obtenerPrehorarios,
   elegirPrehorarioCarrera,
 } from "@/lib/prehorario";
-import type { ResultadoPrehorarios } from "@/lib/prehorario";
 import { leerFechasInicioLabores } from "@/lib/calendarioLabores";
 import { leerRenglonesPDF, urlDocumentoPdf } from "@/lib/pdfTexto";
 import { procesarPrehorarioTexto } from "@/lib/prehorarioTablas";
@@ -77,30 +76,26 @@ export function PruebaCompletaSection({
     setCorriendo(true);
     setState(PASOS_INICIALES);
 
-    // PASO 1: Calendario en el listado (mismo mecanismo del chequeo diario)
+    // PASO 1: Calendario en la página oficial (mismo mecanismo del chequeo diario)
     actualizarPaso("calendario", { estado: "running" });
     const t1 = performance.now();
-    let listing: ResultadoPrehorarios;
     try {
-      listing = await obtenerPrehorarios();
-      const elegido = elegirCalendario(listing.todos ?? []);
+      const oficial = await obtenerCalendarioOficial();
       actualizarPaso("calendario", {
-        estado: elegido ? "success" : "error",
-        datos: elegido
-          ? { archivo: elegido.archivo, url: urlDocumentoPdf(elegido.archivo) }
-          : null,
-        error: elegido
+        estado: oficial ? "success" : "error",
+        datos: oficial,
+        error: oficial
           ? null
-          : "No se encontró archivo `*calendario*` en el listado",
+          : "No se encontró calendario en calendario-escolar.html",
         duracionMs: performance.now() - t1,
       });
 
-      if (!elegido) throw new Error("Sin calendario en el listado");
+      if (!oficial) throw new Error("Sin calendario en la página oficial");
 
       // PASO 2: Fechas del calendario (PDF)
       actualizarPaso("fechasCalendario", { estado: "running" });
       const t2 = performance.now();
-      const lectura = await leerFechasInicioLabores(urlDocumentoPdf(elegido.archivo));
+      const lectura = await leerFechasInicioLabores(urlDocumentoPdf(oficial.archivo), new Date().getFullYear());
       actualizarPaso("fechasCalendario", {
         estado: "success",
         datos: {
@@ -112,9 +107,10 @@ export function PruebaCompletaSection({
         duracionMs: performance.now() - t2,
       });
 
-      // PASO 3: Listado de prehorarios (el mismo fetch del paso 1)
-      actualizarPaso("prehorariosListing", { estado: "success" });
+      // PASO 3: Listado de prehorarios
+      actualizarPaso("prehorariosListing", { estado: "running" });
       const t3 = performance.now();
+      const listing = await obtenerPrehorarios();
       actualizarPaso("prehorariosListing", {
         estado: "success",
         datos: {
@@ -197,19 +193,18 @@ export function PruebaCompletaSection({
     }
   }
 
-  async function reintentoCalendarioPorListado() {
+  async function reintentoCalendarioOficial() {
     setCorriendo(true);
     actualizarPaso("calendario", { estado: "running", error: null });
     const t1 = performance.now();
     try {
-      const listing = await obtenerPrehorarios();
-      const elegido = elegirCalendario(listing.todos ?? []);
+      const oficial = await obtenerCalendarioOficial();
       actualizarPaso("calendario", {
-        estado: elegido ? "success" : "error",
-        datos: elegido
-          ? { archivo: elegido.archivo, url: urlDocumentoPdf(elegido.archivo) }
-          : null,
-        error: elegido ? null : "No se encontró archivo `*calendario*` en el listado",
+        estado: oficial ? "success" : "error",
+        datos: oficial,
+        error: oficial
+          ? null
+          : "No se encontró calendario en calendario-escolar.html",
         duracionMs: performance.now() - t1,
       });
     } catch (error) {
@@ -279,7 +274,7 @@ export function PruebaCompletaSection({
     <section className="flex flex-col gap-3">
       <h4 className="text-sm font-semibold text-on-surface">Prueba completa del pipeline</h4>
       <p className="text-xs text-on-surface-variant">
-        Ejecuta: calendario (listado) → fechas PDF → listado prehorarios → carrera → PDF prehorario → sugerencia horario
+        Ejecuta: calendario (página oficial) → fechas PDF → listado prehorarios → carrera → PDF prehorario → sugerencia horario
       </p>
       <Button
         variant={corriendo ? "secondary" : "primary"}
@@ -292,17 +287,17 @@ export function PruebaCompletaSection({
 
       <Card className="flex flex-col gap-4 text-xs">
         {renderPaso(
-          "1. Calendario (listado)",
+          "1. Calendario (página oficial)",
           state.calendario,
           (d) => `Archivo: ${d.archivo}\nURL: ${d.url}`,
           state.calendario.estado === "error" ? (
             <Button
               variant="secondary"
-              onClick={reintentoCalendarioPorListado}
+              onClick={reintentoCalendarioOficial}
               disabled={corriendo}
               className="ml-5 w-fit"
             >
-              Reintentar consulta del listado
+              Reintentar consulta del calendario oficial
             </Button>
           ) : undefined,
         )}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getNow, subscribeToClock } from "@/lib/devtools/clock";
+import { useClock } from "@/lib/devtest/provider";
 
 export const MINUTE_MS = 60_000;
 
@@ -30,7 +30,8 @@ function isSameMinute(a: Date, b: Date): boolean {
 }
 
 export function useCurrentTime(): Date {
-  const [now, setNow] = useState(() => getNow());
+  const clock = useClock();
+  const [now, setNow] = useState(() => clock.getNow());
 
   useEffect(() => {
     let timeoutId: number | undefined;
@@ -38,7 +39,7 @@ export function useCurrentTime(): Date {
 
     function evaluate() {
       setNow((previous) => {
-        const current = getNow();
+        const current = clock.getNow();
         return isSameMinute(previous, current) ? previous : current;
       });
     }
@@ -51,7 +52,7 @@ export function useCurrentTime(): Date {
     }
 
     function arm() {
-      const delay = Math.max(msUntilNextMinute(getNow()), RETRY_FLOOR_MS);
+      const delay = Math.max(msUntilNextMinute(clock.getNow()), RETRY_FLOOR_MS);
       timeoutId = window.setTimeout(() => {
         evaluate();
         arm();
@@ -63,7 +64,7 @@ export function useCurrentTime(): Date {
     // minute, then re-arm the boundary timer.
     function resync() {
       clearTimer();
-      setNow(getNow());
+      setNow(clock.getNow());
       arm();
     }
 
@@ -116,7 +117,7 @@ export function useCurrentTime(): Date {
 
     // Clock changes (dev simulation) apply immediately, even in background,
     // and resynchronize the next boundary to the shifted time.
-    const unsubscribe = subscribeToClock(start);
+    const unsubscribe = clock.subscribe(start);
 
     return () => {
       stop();
@@ -125,7 +126,7 @@ export function useCurrentTime(): Date {
       document.removeEventListener("pageshow", handlePageShow);
       window.removeEventListener("focus", handleWindowFocus);
     };
-  }, []);
+  }, [clock]);
 
   return now;
 }

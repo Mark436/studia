@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { useClock } from "@/lib/devtest/provider";
 import type { Alumno } from "@/lib/api/client";
 import {
   getTimeUntilReinscripcion,
@@ -33,15 +34,16 @@ export function ReinscripcionTestSection({
 }: {
   alumno: Alumno | null;
 }) {
+  const clock = useClock();
   const [scenario, setScenario] = useState<Scenario>("now");
 
   const fecha = parseReinscripcionDate(alumno);
   const now = (() => {
-    if (!fecha) return new Date();
+    if (!fecha) return clock.getNow();
     const base = fecha.getTime();
     switch (scenario) {
       case "now":
-        return new Date();
+        return clock.getNow();
       case "24h":
         return new Date(base - DIA_MS);
       case "30min":
@@ -51,7 +53,7 @@ export function ReinscripcionTestSection({
       case "past":
         return new Date(base + 2 * DIA_MS);
       case "nodate":
-        return new Date();
+        return clock.getNow();
     }
   })();
 

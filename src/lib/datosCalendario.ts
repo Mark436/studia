@@ -1,7 +1,7 @@
 // Obtención de los datos del calendario: primero lo que ya está guardado en el
 // estado del chequeo; si falta algo (instalación nueva, estado viejo sin fin de
-// clases, o un calendario más nuevo en el listado), se pide on-demand y se
-// persiste. Es el punto de entrada «cuando lleguemos a necesitar los datos».
+// clases, o un calendario más nuevo en la página oficial), se pide on-demand y
+// se persiste. Es el punto de entrada «cuando lleguemos a necesitar los datos».
 
 import {
   estadoTrasAplicarCalendario,
@@ -10,9 +10,8 @@ import {
 } from "@/lib/busquedaHorarios";
 import type { EstadoChequeoHorarios } from "@/lib/busquedaHorarios";
 import { leerFechasInicioLabores } from "@/lib/calendarioLabores";
-import { getNow } from "@/lib/devtools/clock";
 import { urlDocumentoPdf } from "@/lib/pdfTexto";
-import { elegirCalendario, obtenerPrehorarios } from "@/lib/prehorario";
+import { obtenerCalendarioOficial } from "@/lib/prehorario";
 import {
   getSetting,
   setSetting,
@@ -49,10 +48,13 @@ function aDatos(estado: EstadoChequeoHorarios): DatosCalendario | null {
 /**
  * Devuelve los datos del calendario (último día de clases, inicio de labores
  * del siguiente ciclo y publicación de prehorarios). Usa lo guardado si ya
- * está completo; si no, consulta el listado de documentos, lee el calendario
- * vigente y persiste el resultado. Devuelve null si no pudo obtenerlo.
+ * está completo; si no, consulta la página oficial `calendario-escolar.html`,
+ * lee el calendario vigente y persiste el resultado. Devuelve null si no pudo
+ * obtenerlo.
  */
-export async function obtenerDatosCalendario(): Promise<DatosCalendario | null> {
+export async function obtenerDatosCalendario(
+  clock: { getNow: () => Date },
+): Promise<DatosCalendario | null> {
   const estado = parseEstadoChequeo(
     await getSetting(SETTING_HORARIOS_CHECKS_STATE),
   );
@@ -60,18 +62,17 @@ export async function obtenerDatosCalendario(): Promise<DatosCalendario | null> 
   const guardado = aDatos(estado);
   if (guardado) return guardado;
 
-  const listado = await obtenerPrehorarios();
-  const elegido = elegirCalendario(listado.todos ?? []);
-  if (elegido === null) return null;
+  const oficial = await obtenerCalendarioOficial();
+  if (oficial === null) return null;
 
-  const lectura = await leerFechasInicioLabores(urlDocumentoPdf(elegido.archivo));
+  const lectura = await leerFechasInicioLabores(urlDocumentoPdf(oficial.archivo), clock.getNow().getFullYear());
   if (lectura.fechas.length === 0) return null;
 
   const nuevo = estadoTrasAplicarCalendario(
     estado,
     lectura,
-    elegido.archivo,
-    getNow(),
+    oficial.archivo,
+    clock.getNow(),
   );
   await setSetting(SETTING_HORARIOS_CHECKS_STATE, serializarEstadoChequeo(nuevo));
 

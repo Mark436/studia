@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/Input";
 import type { Alumno } from "@/lib/api/client";
 import type { DevMateria } from "../types";
 import type { DevToolsController } from "../useDevConfig";
+import { useClock } from "@/lib/devtest/provider";
 
 const WEEKDAYS: ReadonlyArray<readonly [value: number, label: string]> = [
   [1, "L"],
@@ -47,6 +48,7 @@ function summarize(materia: HorarioMateria): string {
 }
 
 export function MateriasSection({ alumno, dev }: MateriasSectionProps) {
+  const clock = useClock();
   const [draft, setDraft] = useState<DraftMateria>(EMPTY_DRAFT);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,7 +84,7 @@ export function MateriasSection({ alumno, dev }: MateriasSectionProps) {
 
     const materia: DevMateria = {
       ...draft,
-      clave: `DEV-${Date.now().toString(36)}`,
+      clave: `DEV-${clock.getNow().getTime().toString(36)}`,
       nombre: draft.nombre.trim(),
       docente: draft.docente.trim(),
       salon: draft.salon.trim(),
