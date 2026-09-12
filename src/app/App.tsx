@@ -61,6 +61,7 @@ import {
 import { formatProgressDelta } from "@/lib/notifications/progress";
 import { getHomeTab, NAV_ITEMS } from "./navigation";
 import type { TabId } from "./navigation";
+import { DevTestProvider } from "@/lib/devtest/provider";
 
 // A session older than this gets one gentle reminder per day suggesting a
 // pull-to-refresh; the re-auth sheet itself only appears on demand.
@@ -545,8 +546,10 @@ function AppContent() {
 
 export function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <DevTestProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </DevTestProvider>
   );
 }
