@@ -8,7 +8,7 @@ import {
   SETTING_DEV_MODE_ENABLED,
   SETTING_DEV_UNLOCKED,
 } from "@/lib/storage/settingsStore";
-import type { DevConfig, DevMateria } from "./types";
+import type { DevConfig } from "./types";
 import { EMPTY_DEV_CONFIG } from "./types";
 import { isDevBuild } from "./config";
 
@@ -29,26 +29,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function parseMateria(value: unknown): DevMateria | null {
-  if (!isRecord(value)) return null;
-  if (typeof value.clave !== "string" || typeof value.nombre !== "string") {
-    return null;
-  }
-  return {
-    clave: value.clave,
-    nombre: value.nombre,
-    docente: typeof value.docente === "string" ? value.docente : "",
-    salon: typeof value.salon === "string" ? value.salon : "",
-    dias: Array.isArray(value.dias)
-      ? value.dias.filter((day): day is number => typeof day === "number")
-      : [],
-    inicio: typeof value.inicio === "string" ? value.inicio : "",
-    fin: typeof value.fin === "string" ? value.fin : "",
-    calificacion:
-      typeof value.calificacion === "string" ? value.calificacion : "",
-  };
-}
-
 function parseDevConfig(raw: string | null): DevConfig {
   if (!raw) return EMPTY_DEV_CONFIG;
 
@@ -56,37 +36,7 @@ function parseDevConfig(raw: string | null): DevConfig {
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) return EMPTY_DEV_CONFIG;
 
-    const gradeOverrides: Record<string, string> = {};
-    if (isRecord(parsed.gradeOverrides)) {
-      for (const [clave, calificacion] of Object.entries(
-        parsed.gradeOverrides,
-      )) {
-        if (typeof calificacion === "string") {
-          gradeOverrides[clave] = calificacion;
-        }
-      }
-    }
-
     return {
-      clockOffsetMinutes:
-        typeof parsed.clockOffsetMinutes === "number"
-          ? parsed.clockOffsetMinutes
-          : null,
-      extraMaterias: Array.isArray(parsed.extraMaterias)
-        ? parsed.extraMaterias
-            .map(parseMateria)
-            .filter((materia): materia is DevMateria => materia !== null)
-        : [],
-      removedClaves: Array.isArray(parsed.removedClaves)
-        ? parsed.removedClaves.filter(
-            (clave): clave is string => typeof clave === "string",
-          )
-        : [],
-      gradeOverrides,
-      adeudoOverride:
-        typeof parsed.adeudoOverride === "boolean"
-          ? parsed.adeudoOverride
-          : null,
       toastDurationMs: toPositiveNumber(
         parsed.toastDurationMs,
         EMPTY_DEV_CONFIG.toastDurationMs,
@@ -189,8 +139,8 @@ export function useDevConfig(): DevToolsController {
   }, [env]);
 
   // Closing keeps the saved DevConfig (it re-applies on the next unlock) but
-  // pauses all simulation immediately, since overrides only apply while the
-  // panel is enabled.
+  // pauses all simulation immediately: mock state is destroyed and the real
+  // API / clock are restored.
   const disable = useCallback(() => {
     setEnabled(false);
     env.deactivate();

@@ -6,7 +6,6 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Toast } from "@/components/ui/Toast";
 import type { ToastVariant } from "@/components/ui/toastVariants";
 import { DEFAULT_TOAST_DURATION_MS } from "@/components/ui/toastVariants";
-import { applyDevOverrides } from "@/features/devtools/applyDevOverrides";
 import { useDevConfig } from "@/features/devtools/useDevConfig";
 import { useSettings } from "@/features/settings/useSettings";
 import { useAuth } from "@/features/auth/auth-context";
@@ -142,16 +141,10 @@ function AuthenticatedShell() {
   const [toast, setToast] = useState<ActiveToast | null>(null);
   const toastIdRef = useRef(0);
 
-  // Dev simulation is presentation-only: the virtual alumno feeds every
-  // screen, while fetches and persistence keep using the real data. Overrides
-  // pause while the dev panel is closed (enabled === false).
-  const effectiveAlumno = useMemo(
-    () =>
-      alumno && dev.loaded && dev.enabled
-        ? applyDevOverrides(alumno, dev.config)
-        : alumno,
-    [alumno, dev.loaded, dev.enabled, dev.config],
-  );
+  // Dev simulation feeds the screen through the mock API: with Sith=Mock the
+  // app fetches (pull-to-refresh) the mutated mock state, so no presentation
+  // overrides are needed here — alumno is always the app's current data.
+  const effectiveAlumno = alumno;
 
   // Always-on user preferences (apply regardless of dev mode): they previously
   // lived in DevConfig and only took effect while the panel was enabled.

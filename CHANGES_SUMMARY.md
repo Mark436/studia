@@ -1,5 +1,11 @@
 # Dev/Test Mock API System - Changes Summary
 
+> **Actualización (2026-09-12):** el modo dev se consolidó en una sola vía. Se
+> eliminó el sistema de overrides de presentación (`applyDevOverrides`), los
+> botones existentes del panel ahora **mutan el estado mock** y el toggle de
+> API queda **hasta arriba** del panel. La explicación completa de cómo
+> funciona ahora está en **`docs/modo-dev.md`**.
+
 ## Overview
 Implemented a complete Dev/Test mock API system that allows simulating a full isolated session in dev mode. The system uses identical interfaces to production, has zero impact on production, and provides per-API toggles with mutable mock state.
 
@@ -50,7 +56,7 @@ Implemented a complete Dev/Test mock API system that allows simulating a full is
 - **`src/features/devtools/useDevConfig.ts`**: Integrates with `DevTestEnvironment` - `activate()`/`deactivate()` on enable/disable, `reset()` on restore
 - **`src/features/devtools/components/ClockSection.tsx`**: Uses `useClock()` instead of `useCurrentTime`
 - **`src/features/devtools/components/MateriasSection.tsx`**: Uses `useClock()` for unique clave generation
-- **`src/features/devtools/components/ReinscripcionTestSection.tsx`**: Uses `useClock()` for scenario base time
+- **`src/features/devtools/components/ReinscripcionSection.tsx`**: sets the mock reinscription date via relative presets or exact picker; the alert/tarjeta is tested by crossing it with the simulated clock
 - **`src/features/devtools/components/PruebaCompletaSection.tsx`**: Passes `currentYear` to `leerFechasInicioLabores()`
 
 ### Tests
@@ -140,8 +146,10 @@ pnpm build  # ✓ builds successfully
 ## Usage
 
 1. Open Dev Panel (7 taps on student name in Student tab, or auto-enabled in dev builds)
-2. Toggle "API Mode" to **Mock**
-3. Edit mock data in the "Mock Alumno Data", "Mock Grades", "Mock Adeudos" sections
+2. **API toggle at the top**: switch **Sith API** to **Mock**
+3. Edit data in the existing sections (Datos del alumno, Materias, Calificaciones, Adeudos, Avisos) — they now mutate the mock state
 4. Pull-to-refresh → app fetches from `TestSithApi` → grade tracking detects changes → toast fires
-5. Use Clock section to shift time → schedule updates in real-time
-6. Close panel → `deactivate()` destroys mock state, back to real API
+5. Use Clock section to shift time (only while Mock is active) → schedule updates in real-time
+6. Close panel → `deactivate()` destroys mock state, restores Real API and the real clock
+
+Full explanation: **`docs/modo-dev.md`**

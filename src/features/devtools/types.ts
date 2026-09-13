@@ -12,24 +12,14 @@ export interface DevMateria {
   calificacion: string;
 }
 
-// Developer/simulation overrides only. Always-on user preferences (capsule
-// variant, notification channel, capsule collapse, long-press duration) moved
-// to features/settings and no longer live here.
+// Developer/simulation overrides only. Data simulation (grades, materias,
+// adeudos, clock) lives in the DevTestEnvironment mock state; this config is
+// reduced to the panel's own preferences.
 export interface DevConfig {
-  clockOffsetMinutes: number | null;
-  extraMaterias: DevMateria[];
-  removedClaves: string[];
-  gradeOverrides: Record<string, string>;
-  adeudoOverride: boolean | null;
   // Dev-only toast test duration; applied only while the panel is enabled.
   toastDurationMs: number;
 }
 
 export const EMPTY_DEV_CONFIG: DevConfig = {
-  clockOffsetMinutes: null,
-  extraMaterias: [],
-  removedClaves: [],
-  gradeOverrides: {},
-  adeudoOverride: null,
   toastDurationMs: DEFAULT_TOAST_DURATION_MS,
 };

@@ -5,27 +5,16 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import type { ToastVariant } from "@/components/ui/toastVariants";
 import type { Alumno } from "@/lib/api/client";
 import type { NotificationDraft } from "@/lib/notifications/capsuleEvents";
-import type { DevConfig } from "./types";
+import { useDevTestEnvironment } from "@/lib/devtest/provider";
 import { AdeudosSection } from "./components/AdeudosSection";
 import { ClockSection } from "./components/ClockSection";
 import { GradesSection } from "./components/GradesSection";
 import { InteractionSection } from "./components/InteractionSection";
 import { MateriasSection } from "./components/MateriasSection";
 import { PruebaCompletaSection } from "./components/PruebaCompletaSection";
-import { ReinscripcionTestSection } from "./components/ReinscripcionTestSection";
+import { ReinscripcionSection } from "./components/ReinscripcionSection";
 import { ToastsSection } from "./components/ToastsSection";
 import type { DevToolsController } from "./useDevConfig";
-import { useDevTestEnvironment } from "@/lib/devtest/provider";
-
-function hasActiveSimulation(config: DevConfig): boolean {
-  return (
-    config.clockOffsetMinutes !== null ||
-    config.extraMaterias.length > 0 ||
-    config.removedClaves.length > 0 ||
-    Object.keys(config.gradeOverrides).length > 0 ||
-    config.adeudoOverride !== null
-  );
-}
 
 interface DevPanelProps {
   alumno: Alumno | null;
@@ -46,25 +35,22 @@ export function DevPanel({
   const env = useDevTestEnvironment();
   if (!dev.loaded) return null;
 
-  const simulating = hasActiveSimulation(dev.config);
   const sithMode = env.config.sith;
+  const mockActive = sithMode === "mock";
   const mockAlumno = env.getMockAppData()?.alumno ?? null;
 
   return (
     <Card className="flex flex-col gap-5 ring-primary/40">
       <header className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-on-surface">Modo dev</h3>
-        <Badge variant={simulating ? "primary" : "neutral"}>
-          {simulating ? "Simulación activa" : "Inactivo"}
+        <Badge variant={mockActive ? "primary" : "neutral"}>
+          {mockActive ? "Simulación activa" : "Inactivo"}
         </Badge>
       </header>
 
-      <ClockSection dev={dev} />
-      <div className="border-t border-outline-variant pt-4" />
-
-      {/* API Mode Controls */}
+      {/* API mode toggles: always at the top */}
       <section className="flex flex-col gap-3">
-        <h4 className="text-sm font-semibold text-on-surface">API Mode</h4>
+        <h4 className="text-sm font-semibold text-on-surface">API</h4>
         <SegmentedControl
           label="Sith API"
           value={sithMode}
@@ -77,166 +63,133 @@ export function DevPanel({
       </section>
       <div className="border-t border-outline-variant pt-4" />
 
-      {/* Mock Data Editor (only when Sith=mock) */}
-      {sithMode === "mock" && mockAlumno && (
+      {/* Mock data editing (only applies while Sith=Mock) */}
+      {mockActive ? (
         <>
-          <section className="flex flex-col gap-3">
-            <h4 className="text-sm font-semibold text-on-surface">Mock Alumno Data</h4>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <label className="text-xs text-on-surface-variant">Nombre</label>
-                <input
-                  type="text"
-                  value={mockAlumno.nombre}
-                  onChange={(e) => {
-                    const newAlumno = { ...mockAlumno, nombre: e.target.value };
-                    env.setMockAppData({ ...env.getMockAppData()!, alumno: newAlumno });
-                  }}
-                  className="h-9 px-3 rounded-lg border border-outline bg-surface text-sm text-on-surface focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs text-on-surface-variant">Número de control</label>
-                <input
-                  type="text"
-                  value={mockAlumno.numeroControl}
-                  onChange={(e) => {
-                    const newAlumno = { ...mockAlumno, numeroControl: e.target.value };
-                    env.setMockAppData({ ...env.getMockAppData()!, alumno: newAlumno });
-                  }}
-                  className="h-9 px-3 rounded-lg border border-outline bg-surface text-sm text-on-surface focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs text-on-surface-variant">Carrera</label>
-                <input
-                  type="text"
-                  value={mockAlumno.carrera}
-                  onChange={(e) => {
-                    const newAlumno = { ...mockAlumno, carrera: e.target.value };
-                    env.setMockAppData({ ...env.getMockAppData()!, alumno: newAlumno });
-                  }}
-                  className="h-9 px-3 rounded-lg border border-outline bg-surface text-sm text-on-surface focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs text-on-surface-variant">Semestre</label>
-                <input
-                  type="number"
-                  value={mockAlumno.semestre}
-                  onChange={(e) => {
-                    const newAlumno = { ...mockAlumno, semestre: Number(e.target.value) };
-                    env.setMockAppData({ ...env.getMockAppData()!, alumno: newAlumno });
-                  }}
-                  className="h-9 px-3 rounded-lg border border-outline bg-surface text-sm text-on-surface focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
-                />
-              </div>
-            </div>
-          </section>
-          <div className="border-t border-outline-variant pt-4" />
+          <p className="text-xs text-on-surface-variant">
+            Edita los datos simulados. El cambio aplica al hacer
+            pull-to-refresh: la app vuelve a pedir los datos y detecta las
+            diferencias (toast de calificaciones, adeudos, reinscripción,
+            avisos). Solo el Reloj es instantáneo.
+          </p>
 
-          <section className="flex flex-col gap-3">
-            <h4 className="text-sm font-semibold text-on-surface">Mock Grades</h4>
-            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
-              {mockAlumno.boleta.materias.map((materia: typeof mockAlumno.boleta.materias[0]) => (
-                <div
-                  key={materia.clave}
-                  className="flex items-center gap-3 p-2 rounded-lg bg-surface"
-                >
-                  <span className="flex-1 min-w-0 text-sm text-on-surface truncate">
-                    {materia.nombre}
-                  </span>
-                  <span className="text-xs text-on-surface-variant tabular-nums">
-                    {materia.calificacion || "—"}
-                  </span>
+          {mockAlumno ? (
+            <section className="flex flex-col gap-3">
+              <h4 className="text-sm font-semibold text-on-surface">
+                Datos del alumno
+              </h4>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs text-on-surface-variant">
+                    Nombre
+                  </label>
                   <input
                     type="text"
-                    value={materia.calificacion}
-                    onChange={(e) => env.updateGrade(materia.clave, e.target.value)}
-                    inputMode="numeric"
-                    className="h-8 w-16 rounded-lg border border-outline bg-surface px-2 text-center text-sm tabular-nums text-on-surface focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
+                    value={mockAlumno.nombre}
+                    onChange={(e) => {
+                      const newAlumno = { ...mockAlumno, nombre: e.target.value };
+                      env.setMockAppData({ ...env.getMockAppData()!, alumno: newAlumno });
+                    }}
+                    className="h-9 px-3 rounded-lg border border-outline bg-surface text-sm text-on-surface focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
                   />
                 </div>
-              ))}
-            </div>
-          </section>
-          <div className="border-t border-outline-variant pt-4" />
-
-          <section className="flex flex-col gap-3">
-            <h4 className="text-sm font-semibold text-on-surface">Mock Adeudos</h4>
-            <div className="flex flex-col gap-2">
-              {Object.entries(mockAlumno.adeudos)
-                .filter(([key]) => key !== "tieneAdeudos")
-                .map(([key, value]: [string, string]) => (
-                  <div
-                    key={key}
-                    className="flex items-center gap-3 p-2 rounded-lg bg-surface"
-                  >
-                    <label className="text-xs text-on-surface-variant capitalize w-24">
-                      {key}
-                    </label>
-                    <input
-                      type="text"
-                      value={value}
-                      onChange={(e) => {
-                        const newAdeudos = { ...mockAlumno.adeudos, [key]: e.target.value };
-                        env.setAdeudos(newAdeudos as typeof mockAlumno.adeudos);
-                      }}
-                      className="flex-1 h-8 px-3 rounded-lg border border-outline bg-surface text-sm text-on-surface focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
-                    />
-                  </div>
-                ))}
-              <div className="flex items-center gap-3 p-2 rounded-lg bg-surface">
-                <label className="text-xs text-on-surface-variant w-24">tieneAdeudos</label>
-                <input
-                  type="checkbox"
-                  checked={mockAlumno.adeudos.tieneAdeudos}
-                  onChange={(e) => {
-                    const newAdeudos = { ...mockAlumno.adeudos, tieneAdeudos: e.target.checked };
-                    env.setAdeudos(newAdeudos as typeof mockAlumno.adeudos);
-                  }}
-                />
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs text-on-surface-variant">
+                    Número de control
+                  </label>
+                  <input
+                    type="text"
+                    value={mockAlumno.numeroControl}
+                    onChange={(e) => {
+                      const newAlumno = { ...mockAlumno, numeroControl: e.target.value };
+                      env.setMockAppData({ ...env.getMockAppData()!, alumno: newAlumno });
+                    }}
+                    className="h-9 px-3 rounded-lg border border-outline bg-surface text-sm text-on-surface focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs text-on-surface-variant">
+                    Carrera
+                  </label>
+                  <input
+                    type="text"
+                    value={mockAlumno.carrera}
+                    onChange={(e) => {
+                      const newAlumno = { ...mockAlumno, carrera: e.target.value };
+                      env.setMockAppData({ ...env.getMockAppData()!, alumno: newAlumno });
+                    }}
+                    className="h-9 px-3 rounded-lg border border-outline bg-surface text-sm text-on-surface focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs text-on-surface-variant">
+                    Semestre
+                  </label>
+                  <input
+                    type="number"
+                    value={mockAlumno.semestre}
+                    onChange={(e) => {
+                      const newAlumno = { ...mockAlumno, semestre: Number(e.target.value) };
+                      env.setMockAppData({ ...env.getMockAppData()!, alumno: newAlumno });
+                    }}
+                    className="h-9 px-3 rounded-lg border border-outline bg-surface text-sm text-on-surface focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
+                  />
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          ) : (
+            <p className="text-xs text-on-surface-variant">
+              No hay datos simulados cargados. Inicia sesión o haz un
+              pull-to-refresh con la API en Real para sembrar el modo Mock.
+            </p>
+          )}
+
+          <div className="border-t border-outline-variant pt-4" />
+
+          <MateriasSection />
+          <div className="border-t border-outline-variant pt-4" />
+          <GradesSection />
+          <div className="border-t border-outline-variant pt-4" />
+          <AdeudosSection />
+          <div className="border-t border-outline-variant pt-4" />
+          <ReinscripcionSection />
           <div className="border-t border-outline-variant pt-4" />
 
           <section className="flex flex-col gap-3">
-            <h4 className="text-sm font-semibold text-on-surface">Mock Avisos</h4>
-            <button
-              type="button"
-              onClick={() => env.addAviso({
-                titulo: "Aviso de prueba",
-                mensaje: "Este es un aviso simulado desde el modo dev",
-                tipo: "info",
-              })}
-              className="h-9 px-3 rounded-lg bg-primary text-on-primary text-sm font-medium"
+            <h4 className="text-sm font-semibold text-on-surface">Avisos</h4>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                env.addAviso({
+                  titulo: "Aviso de prueba",
+                  mensaje: "Este es un aviso simulado desde el modo dev",
+                  tipo: "info",
+                })
+              }
+              className="h-9 w-full"
             >
               Agregar aviso de prueba
-            </button>
+            </Button>
           </section>
-          <div className="border-t border-outline-variant pt-4" />
         </>
+      ) : (
+        <p className="text-xs text-on-surface-variant">
+          Cambia la API a Mock para editar los datos simulados.
+        </p>
       )}
+      <div className="border-t border-outline-variant pt-4" />
 
-      <MateriasSection alumno={alumno} dev={dev} />
+      <ClockSection />
       <div className="border-t border-outline-variant pt-4" />
-      <GradesSection alumno={alumno} dev={dev} onShowToast={onShowToast} />
-      <div className="border-t border-outline-variant pt-4" />
-      <AdeudosSection dev={dev} onShowToast={onShowToast} />
-      <div className="border-t border-outline-variant pt-4" />
-      <ReinscripcionTestSection alumno={alumno} />
-      <div className="border-t border-outline-variant pt-4" />
+
       <PruebaCompletaSection alumno={alumno} />
       <div className="border-t border-outline-variant pt-4" />
-      <InteractionSection
-        onSendTestNotification={onSendTestNotification}
-      />
+      <InteractionSection onSendTestNotification={onSendTestNotification} />
       <div className="border-t border-outline-variant pt-4" />
       <ToastsSection dev={dev} onShowToast={onShowToast} />
 
       <div className="flex flex-col gap-2 border-t border-outline-variant pt-4">
-        {simulating ? (
+        {mockActive ? (
           <Button
             variant="secondary"
             onClick={dev.resetConfig}

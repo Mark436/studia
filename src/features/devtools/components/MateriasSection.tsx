@@ -1,11 +1,10 @@
 import { useState } from "react";
-import type { HorarioMateria } from "sith-api-client";
+import type { HorarioDia } from "sith-api-client";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import type { Alumno } from "@/lib/api/client";
+import { useClock, useDevTestEnvironment } from "@/lib/devtest/provider";
 import type { DevMateria } from "../types";
-import type { DevToolsController } from "../useDevConfig";
-import { useClock } from "@/lib/devtest/provider";
+import { toCalificacionMateria, toHorarioMateria } from "../materiasAdapter";
 
 const WEEKDAYS: ReadonlyArray<readonly [value: number, label: string]> = [
   [1, "L"],
@@ -36,24 +35,21 @@ const EMPTY_DRAFT: DraftMateria = {
   calificacion: "",
 };
 
-interface MateriasSectionProps {
-  alumno: Alumno | null;
-  dev: DevToolsController;
-}
-
-function summarize(materia: HorarioMateria): string {
-  return Object.values(materia.dias)
+function summarize(dias: HorarioDia): string {
+  return Object.values(dias)
     .filter((value) => value !== undefined)
     .join(" · ");
 }
 
-export function MateriasSection({ alumno, dev }: MateriasSectionProps) {
+export function MateriasSection() {
+  const env = useDevTestEnvironment();
   const clock = useClock();
   const [draft, setDraft] = useState<DraftMateria>(EMPTY_DRAFT);
   const [error, setError] = useState<string | null>(null);
 
+  const mockAlumno = env.getMockAppData()?.alumno ?? null;
   const nameByClave = new Map(
-    (alumno?.boleta.materias ?? []).map((materia) => [
+    (mockAlumno?.boleta.materias ?? []).map((materia) => [
       materia.clave,
       materia.nombre,
     ]),
@@ -91,33 +87,15 @@ export function MateriasSection({ alumno, dev }: MateriasSectionProps) {
       calificacion: draft.calificacion.trim(),
     };
 
-    dev.updateConfig((previous) => ({
-      ...previous,
-      extraMaterias: [...previous.extraMaterias, materia],
-    }));
+    env.addMateria({
+      horario: toHorarioMateria(materia),
+      calificacion: toCalificacionMateria(materia),
+    });
     setDraft(EMPTY_DRAFT);
     setError(null);
   }
 
-  function removeMateria(clave: string) {
-    dev.updateConfig((previous) =>
-      clave.startsWith("DEV-")
-        ? {
-            ...previous,
-            extraMaterias: previous.extraMaterias.filter(
-              (materia) => materia.clave !== clave,
-            ),
-          }
-        : {
-            ...previous,
-            removedClaves: previous.removedClaves.includes(clave)
-              ? previous.removedClaves
-              : [...previous.removedClaves, clave],
-          },
-    );
-  }
-
-  const materias = alumno?.horario ?? [];
+  const materias = mockAlumno?.horario ?? [];
 
   return (
     <section className="flex flex-col gap-3">
@@ -135,12 +113,12 @@ export function MateriasSection({ alumno, dev }: MateriasSectionProps) {
                   {nameByClave.get(materia.clave) ?? materia.clave}
                 </p>
                 <p className="truncate text-xs text-on-surface-variant">
-                  {summarize(materia)}
+                  {summarize(materia.dias)}
                 </p>
               </div>
               <Button
                 variant="ghost"
-                onClick={() => removeMateria(materia.clave)}
+                onClick={() => env.removeMateria(materia.clave)}
                 className="h-8 shrink-0 px-2 text-xs"
                 aria-label={`Quitar ${nameByClave.get(materia.clave) ?? materia.clave}`}
               >
@@ -151,7 +129,7 @@ export function MateriasSection({ alumno, dev }: MateriasSectionProps) {
         </ul>
       ) : (
         <p className="text-xs text-on-surface-variant">
-          No hay materias en el horario.
+          No hay materias en el horario simulado.
         </p>
       )}
 

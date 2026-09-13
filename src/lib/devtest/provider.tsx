@@ -3,8 +3,6 @@ import { DevTestEnvironment } from "./environment";
 import type { SithApi, Clock, DevTestEnvironmentInterface } from "./interfaces";
 
 interface DevTestContextValue {
-  sithApi: SithApi;
-  clock: Clock;
   environment: DevTestEnvironmentInterface;
 }
 
@@ -12,24 +10,16 @@ const DevTestContext = createContext<DevTestContextValue | null>(null);
 
 export function DevTestProvider({ children }: { children: ReactNode }) {
   const env = DevTestEnvironment;
-  const [sithApi] = useState(() => env.getSithApi());
-  const [clock] = useState(() => env.getClock());
+  const [, setVersion] = useState(0);
 
-  useEffect(() => {
-    const unsubSith = () => {
-      // SithApi doesn't have subscriptions, but we could add if needed
-    };
-    const unsubClock = clock.subscribe(() => {
-      // Clock changes trigger re-renders via components using useClock
-    });
-    return () => {
-      unsubSith();
-      unsubClock();
-    };
-  }, [clock]);
+  // Re-render the subtree (and produce a new context value) on every
+  // environment change: mode toggles, mock-data mutations, activate/reset.
+  useEffect(() => env.subscribe(() => setVersion((value) => value + 1)), [env]);
+
+  const value: DevTestContextValue = { environment: env };
 
   return (
-    <DevTestContext.Provider value={{ sithApi, clock, environment: env }}>
+    <DevTestContext.Provider value={value}>
       {children}
     </DevTestContext.Provider>
   );
@@ -48,10 +38,10 @@ export function useClock(): Clock {
   if (!context) {
     throw new Error("useClock must be used within DevTestProvider");
   }
-  return context.clock;
+  return context.environment.getClock();
 }
 
-export function useDevTestEnvironment() {
+export function useDevTestEnvironment(): DevTestEnvironmentInterface {
   const context = useContext(DevTestContext);
   if (!context) {
     throw new Error("useDevTestEnvironment must be used within DevTestProvider");

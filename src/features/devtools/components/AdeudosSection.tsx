@@ -1,34 +1,15 @@
-import { NEW_ADEUDO_TOAST } from "@/lib/toastMessages";
-import type { ToastVariant } from "@/components/ui/toastVariants";
-import type { DevToolsController } from "../useDevConfig";
+import { useDevTestEnvironment } from "@/lib/devtest/provider";
 
-type AdeudoOption = { label: string; value: boolean | null };
+type AdeudoOption = { label: string; value: boolean };
 
 const OPTIONS: ReadonlyArray<AdeudoOption> = [
-  { label: "Real", value: null },
   { label: "Con adeudo", value: true },
   { label: "Sin adeudo", value: false },
 ];
 
-interface AdeudosSectionProps {
-  dev: DevToolsController;
-  onShowToast?: (message: string, variant: ToastVariant) => void;
-}
-
-export function AdeudosSection({ dev, onShowToast }: AdeudosSectionProps) {
-  const current = dev.config.adeudoOverride;
-
-  function select(option: AdeudoOption) {
-    // Mirrors the production trigger: the designed toast fires only on the
-    // clean -> with-debt transition, never when debt persists or clears.
-    if (option.value === true && current !== true) {
-      onShowToast?.(NEW_ADEUDO_TOAST, "error");
-    }
-    dev.updateConfig((previous) => ({
-      ...previous,
-      adeudoOverride: option.value,
-    }));
-  }
+export function AdeudosSection() {
+  const env = useDevTestEnvironment();
+  const hasAdeudos = env.getMockAppData()?.alumno.adeudos.tieneAdeudos ?? false;
 
   return (
     <section className="flex flex-col gap-3">
@@ -39,13 +20,13 @@ export function AdeudosSection({ dev, onShowToast }: AdeudosSectionProps) {
         className="flex gap-2"
       >
         {OPTIONS.map((option) => {
-          const selected = current === option.value;
+          const selected = hasAdeudos === option.value;
           return (
             <button
               key={option.label}
               type="button"
-              aria-pressed={selected}
-              onClick={() => select(option)}
+aria-pressed={selected}
+          onClick={() => env.setAdeudosPresent(option.value)}
               className={`h-9 flex-1 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
                 selected
                   ? "bg-primary text-on-primary"
@@ -58,8 +39,8 @@ export function AdeudosSection({ dev, onShowToast }: AdeudosSectionProps) {
         })}
       </div>
       <p className="text-xs text-on-surface-variant">
-        Solo cambia lo que se muestra en la app; los datos guardados no se tocan.
-        Al entrar en adeudo se muestra el mismo aviso que en producción.
+        Se aplica a los datos simulados; al hacer pull-to-refresh se muestra el
+        mismo aviso que en producción si se entra en adeudo.
       </p>
     </section>
   );
