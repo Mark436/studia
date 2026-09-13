@@ -125,6 +125,89 @@ Abrir app → caché restaurada sin credenciales
 
 Commit: `feat(auth): daily re-auth reminder with toast`
 
+## Fase E — Endpoint de notificaciones desde el backend (propuesta)
+
+> Propuesta para discutir; las decisiones abiertas (A y B) no están cerradas
+> todavía. No implementar hasta definirlas.
+
+### Contexto
+
+Hoy las notificaciones son **100 % locales**: se deciden dentro de
+`AuthProvider` en cada login/refresh (`notifyNewAdeudos`,
+`notifyCareerProgress`, `notifyNewReinscripcion`) comparando el snapshot
+anterior contra el nuevo, y se muestran como toast/cápsula. La única vía a
+"sistema" es `registration.showNotification` con opt-in
+(`SETTING_ADEUDO_ALERTS_OPT_IN`) y permiso concedido; **el service worker
+aún no maneja eventos `push`** (el PWA usa `generateSW`, que no permite
+código propio).
+
+No existe backend de la app: el lado servidor es solo el proxy Sith
+(`netlify/functions/sith-proxy.mts`) y el mirror `api.marcosochoa.dev/studia-proxy/`.
+
+**Objetivo:** que el backend pueda **empujar notificaciones** (nuevas
+calificaciones, adeudo, reinscripción, avisos) aunque la app esté cerrada, y
+que el aviso deje de depender de que el cliente abra o haga pull-to-refresh.
+
+### Restricción de seguridad (no negociable)
+
+**El endpoint no recibe ni almacena la contraseña.** El cliente sigue
+logueando directo contra Sith con credenciales solo en memoria; el backend de
+notificaciones recibe como mucho un token de suscripción/identificador de
+dispositivo, nunca credenciales derivables.
+
+### Decisión abierta A — ¿quién detecta el cambio?
+
+- **Opción 1 (recomendada):** el cliente conserva la detección actual
+  (`lib/notifications/*`); la fase E solo añade el **canal** para que el
+  backend mande al cliente eventos que no salen de un fetch del alumno
+  (avisos del instituto, recordatorios, etc.). El backend empuja payloads
+  "finales" `{ titulo, cuerpo, tag, ruta }`; sin lógica de negocio duplicada.
+- **Opción 2:** el backend detecta por alumno (consultar Sith en su nombre →
+  requiere sesión/capacidad servidor, más superficie y fricción; solo si la
+  fase futura lo exige).
+
+### Decisión abierta B — transporte
+
+- **Web Push (VAPID) recomendado:** llega con la app cerrada; ya somos PWA.
+- **Inbox REST (long-polling)** como complemento de desarrollo/cuando el push
+  no esté disponible; no llega con la app cerrada.
+
+### Implementación v1 (Web Push)
+
+- **Service worker:** migrar de `generateSW` a `injectManifest` con un
+  `src/sw.ts` propio que importe Workbox y agregue los handlers `push` y
+  `notificationclick` (necesario: generateSW no permite código propio).
+- **`src/lib/notifications/push.ts`:** `solicitarSuscripcion()` con VAPID
+  public key, medir longitud/expiración, persistir `PushSubscription` en
+  IndexedDB (`lib/storage/`) y re-suscribir al expirar.
+- **Endpoint serverless** `netlify/functions/push.mts`: `POST /api/push` con
+  `{ dispositivo, kind, payload }`; validar, dedup por `tag` y entregar vía
+  Web Push (VAPID private key por env var). Sin conocimiento de credenciales.
+- **Click → deep-link:** `notificationclick` abre la ruta correcta
+  (Horario/Calificaciones/Alumno/Avisos) según el payload.
+- **Reuso del seam existente:** los detectores locales preservan su decisión;
+  el push entra por detrás del mismo punto donde hoy está el comentario
+  «Server push can later replace the local dispatch behind this same seam»
+  (`lib/notifications/adeudos.ts`), como un transport adicional.
+- **Modo dev:** botón "Push entrante" en el panel que recorre el mismo handler
+  que el push real (mismo patrón que `TestSithApi`), para probar payloads sin
+  backend.
+
+### Entregables / commits
+
+1. `feat(push): migrate to injectManifest sw and subscribe with VAPID`
+2. `feat(push): backend push endpoint with per-tag dedupe (netlify function)`
+3. `feat(push): handle push/notificationclick with deep-link`
+
+### Riesgos
+
+- VAPID/dominio y permiso: el push del navegador exige opt-in + permiso
+  ("granted"); iOS exige 16.4+ y la app añadida al home.
+- Si un día se avanza a la decisión A-2, el scraping de Sith con sesión ajena
+  puede chocar con límites/anti-bot; limitar a tokens cortos de sesión.
+- El SW único del PWA no puede tener `purpose` mezclado en algunos
+  navegadores; verificar compatibilidad al migrar a `injectManifest`.
+
 ## Verificación por fase
 
 ```bash
