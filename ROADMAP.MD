@@ -440,24 +440,30 @@ antes de la inscripción.
 - [x] Fecha de modificación de cada archivo del listado (`parseArchivosConFecha`);
   el botón de prehorario y el nuevo de calendario la validan contra `getNow()`
   (reloj del modo dev) con una ventana de 7 días.
-- [x] **Detección del calendario por listado en vacaciones** (decisión del
-  dueño, 2026-09-08 — revisa el fallo anterior que retiró `elegirCalendario`):
-  durante las vacaciones de fin de clases (`fechaFinDeClases` →
-  `fechaInicioLabores` del ciclo siguiente) el chequeo consulta el listado
-  `ith.mx/documentos/?C=M;O=D` a lo sumo cada 7 días y elige el primer archivo
-  `*calendario*` (`elegirCalendario` en `src/lib/prehorario.ts`). Al detectar
-  uno distinto al procesado lo aplica **silenciosamente** (sin toast). Sin
+- [x] **Detección del calendario desde la página oficial en vacaciones**
+  (restaurado 2026-09-10; **revierte la decisión del 2026-09-08** de usar el
+  listado — el listado ignoraba `?C=M;O=D`, elegía el calendario 2024 y las
+  fechas volvían vacías): el chequeo consulta `calendario-escolar.html` (vía
+  mirror `https://api.marcosochoa.dev/ith/`) a lo sumo cada 7 días y toma el
+  calendario vigente embebido (`obtenerCalendarioOficial` /
+  `parseCalendarioOficial` en `src/lib/prehorario.ts`). Al detectar uno
+  distinto al procesado lo aplica **silenciosamente** (sin toast). Sin
   ventanas anuales: la cadencia la controla el chequeo, no una ventana de días
   sobre el archivo.
-- [x] La página oficial `ith.mx/calendario-escolar.html` y sus lectores
-  (`obtenerCalendarioOficial`, `parseCalendarioOficial`,
-  `interpretarFuenteCalendario`) se **eliminaron** (2026-09-08): el listado es
-  la única fuente del calendario.
+- [x] `elegirCalendario` / `esCalendario` (detección por listado) se
+  **eliminaron**; `obtenerCalendarioOficial`, `parseCalendarioOficial` y
+  `interpretarFuenteCalendario` operan sobre la página oficial
+  `calendario-escolar.html` (decisión del dueño: el calendario sale de la
+  página oficial, no del listado).
 - [x] Prueba de **calendario** en el harness del pipeline
-  (`PruebaCompletaSection`): el paso 1 consulta el listado con
-  `obtenerPrehorarios()` + `elegirCalendario()` (mismo mecanismo del chequeo
-  diario) y el paso 2 lee las fechas del PDF con pdfjs (inicio de labores,
-  actividad 5 y fin de clases).
+  (`PruebaCompletaSection`): el paso 1 consulta la página oficial con
+  `obtenerCalendarioOficial()` (mismo mecanismo del chequeo diario) y el paso
+  2 lee las fechas del PDF con pdfjs (inicio de labores, actividad 5 y fin de
+  clases).
+- [x] El extractor de fechas tolera el **espaciado letra a letra** del PDF
+  (`P E R IODO`, `F i n de cl as es`, `20 26`) y `extraerFinDeClases` compara
+  todas las filas de «fin de clases» (licenciatura vs idiomas) en vez de solo
+  la primera (`src/lib/calendarioLabores.ts`).
 - [x] **Desempate por tokens distintivos**: se descartan los genéricos
   (INGENIERIA, LICENCIATURA, EN, E, DE, DEL, LA, EL, UN, UNA, AL), los nombres
   sin espacio se parten por el punto (`ING.INFORMATICA` → ING + INFORMATICA) y
@@ -468,9 +474,10 @@ antes de la inscripción.
   lógica pura): sin ventanas anuales. La búsqueda del calendario del ciclo
   siguiente corre dentro de la **ventana vacacional** (`fechaFinDeClases` →
   `fechaInicioLabores`): `procesar-calendario` (aplicar las fechas del PDF
-  nuevo) → `buscar-calendario` (consultar el listado, mínimo 7 días entre
-  consultas) → al salir de vacaciones `esperar-prehorario` hasta la **fecha de
-  la actividad 5** (fallback labores + 1 día) → `buscar-prehorario` →
+  nuevo) → `buscar-calendario` (consultar la página oficial, mínimo 7 días
+  entre consultas) → al salir de vacaciones `esperar-prehorario` hasta la
+  **fecha de la actividad 5** (fallback labores + 1 día) → `buscar-prehorario`
+  →
   `completado`; `sin-datos` cuando no hay calendario procesado. Un calendario
   nuevo detectado manda sobre el resto y reinaugura el ciclo. Migración del
   estado de los ciclos con ventanas: `calendarioVisto` se asume ya procesado y
@@ -570,13 +577,14 @@ Catálogo central de **eventos, disparadores y cadencias**: [`docs/sugerir-horar
 - [x] **Guard de modo offline** en el chequeo diario: sin conexión no se busca
   ni se persiste; el listener `online` vuelve a disparar — ver
   `docs/sugerir-horario.md` §2.
-- [x] Cadencia de la búsqueda del calendario en vacaciones: el listado
-  `documentos/?C=M;O=D` se consulta a lo sumo **cada 7 días**
-  (`diasEntreBusquedasCalendario`, gate `pasoTiempoBusquedaCalendario`) dentro
-  de la ventana vacacional y sin límite de antigüedad sobre el archivo; al
-  salir de vacaciones (inicio de labores) se detiene. En clases, la fase
-  `buscar-prehorario` se re-evalúa cada chequeo con la **fecha de la actividad
-  5**; el fallback `labores + 1 día` solo aplica si el PDF no trae la actividad.
+- [x] Cadencia de la búsqueda del calendario en vacaciones: la página oficial
+  `calendario-escolar.html` (`obtenerCalendarioOficial`) se consulta a lo sumo
+  **cada 7 días** (`diasEntreBusquedasCalendario`, gate
+  `pasoTiempoBusquedaCalendario`) dentro de la ventana vacacional y sin límite
+  de antigüedad sobre el archivo; al salir de vacaciones (inicio de labores)
+  se detiene. En clases, la fase `buscar-prehorario` se re-evalúa cada chequeo
+  con la **fecha de la actividad 5**; el fallback `labores + 1 día` solo aplica
+  si el PDF no trae la actividad.
 - [x] **Detección silenciosa**: el calendario nuevo detectado en vacaciones se
   aplica sin toast; el aviso existe solo para el prehorario de la carrera
   (1 vez por archivo).
@@ -584,4 +592,4 @@ Catálogo central de **eventos, disparadores y cadencias**: [`docs/sugerir-horar
   es hoy o ya pasó, el bucle de las 18:00 avisa una sola vez
   (`avisoTurnosEnviado`) y el nudge de refrescar lo menciona al sugerir
   actualizar datos. No existe un archivo «SIG»: la detección del calendario es
-  por el **primer `*calendario*` del listado** durante las vacaciones.
+  por la **página oficial** (`calendario-escolar.html`) durante las vacaciones.

@@ -56,7 +56,7 @@ lo que es **sesión / persistencia** usa el reloj real. No mezclar.
 | --- | --- |
 | Hora del bucle | `HORA_CHEQUEO = 18` (`busquedaHorarios.ts:8`) — desde las **18:00** (`esHoraChequeo`: `getHours() >= 18`) |
 | Ventana vacacional | `[fechaFinDeClases, fechaInicioLabores)` = fin de clases del periodo en curso → inicio de labores del ciclo siguiente (p. ej. 11-dic-2026 → 6-ene-2027) |
-| Cadencia de búsqueda del calendario | `diasEntreBusquedasCalendario = 7` — el listado se consulta a lo sumo cada 7 días dentro de la ventana (`pasoTiempoBusquedaCalendario`) |
+| Cadencia de búsqueda del calendario | `diasEntreBusquedasCalendario = 7` — la página oficial se consulta a lo sumo cada 7 días dentro de la ventana (`pasoTiempoBusquedaCalendario`) |
 | Espera tras labores (fallback) | `diasTrasLabores = 1` |
 | Gate de horas | **no existe**: el bucle vuelve a evaluar cada vez que corre a las 18:00; solo avisa lo nuevo |
 | Cadencia | 1 vez por día a las 18:00 (si la app está abierta) |
@@ -86,8 +86,8 @@ diasTrasLabores` (`objetivoPrehorario`).
 ### Guardas
 
 - `esHoraChequeo`: antes de las 18:00 **no se toca el API**.
-- `pasoTiempoBusquedaCalendario`: dentro de la ventana vacacional el listado se
-  consulta a lo sumo cada 7 días.
+- `pasoTiempoBusquedaCalendario`: dentro de la ventana vacacional la página
+  oficial se consulta a lo sumo cada 7 días.
 - **Offline**: `if (!navigator.onLine) return` — sin conexión no se busca ni se
   persiste; el listener `online` re-dispara.
 
@@ -105,15 +105,16 @@ diasTrasLabores` (`objetivoPrehorario`).
 
 | Publicación | Fuente |
 | --- | --- |
-| Calendario del ciclo siguiente | listado `ith.mx/documentos/?C=M;O=D` — primer `*calendario*` (`elegirCalendario()`, `lib/prehorario.ts`) |
+| Calendario del ciclo siguiente | página oficial `calendario-escolar.html` vía mirror — calendario vigente embebido (`obtenerCalendarioOficial()`, `lib/prehorario.ts`) |
 | Prehorario de la carrera | mismo listado — `obtenerPrehorarios()` + `elegirPrehorarioCarrera()` |
 
 Fechas reales de publicación verificadas: 2026-1 V1 **26-ene-2026** (¡tras el
 inicio de labores 7-ene!), V2 04-feb, V2-2 22-abr; 2026-2 V1 **29-may**, V2
 12-ago; 2024-1 18-dic-2023; 2023-1 10-ene-2023. No hay patrón estable →
-búsqueda por **primer `*calendario*` del listado** dentro de la ventana
-vacacional (cadencia 7 días, sin límite de antigüedad). El calendario **no
-anuncia su propia publicación**.
+búsqueda por **página oficial** (`obtenerCalendarioOficial()` → PDF vigente)
+dentro de la ventana vacacional (cadencia 7 días). El calendario **no anuncia
+su propia publicación** y el listado no refleja el orden real
+(revocado 2026-09-10: elegía el calendario 2024).
 
 ---
 

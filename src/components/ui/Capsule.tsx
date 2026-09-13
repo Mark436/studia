@@ -593,7 +593,7 @@ export function Capsule({
       {progressPercent !== undefined ? (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] border-2 border-[var(--studia-cobalto)]"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] border-2 border-primary"
           style={{
             mask: `linear-gradient(to right, black ${progress}%, transparent ${progress}%)`,
           }}
@@ -603,9 +603,7 @@ export function Capsule({
       {/* Content: single anchor (collapsed pill / expanded top block), with
           detail stacked below when expanded. */}
       <div
-        className={
-          isExpanded ? "min-w-0" : "flex min-w-0 items-center gap-1.5"
-        }
+        className={isExpanded ? "min-w-0" : "flex min-w-0 items-center gap-1.5"}
       >
         {isExpanded ? (
           <div className="flex min-w-0 flex-col gap-capsule-gap">

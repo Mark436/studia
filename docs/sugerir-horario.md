@@ -18,24 +18,24 @@ documentos):
 
 | Publicación | Fuente |
 | --- | --- |
-| Calendario del ciclo siguiente | listado público `ith.mx/documentos/?C=M;O=D` — primer archivo `*calendario*` (`elegirCalendario()`) |
-| Prehorario de la carrera | mismo listado (`obtenerPrehorarios()` + `elegirPrehorarioCarrera()`) |
+| Calendario del ciclo siguiente | página oficial `calendario-escolar.html` vía mirror `https://api.marcosochoa.dev/ith/` — calendario vigente embebido (`obtenerCalendarioOficial()`) |
+| Prehorario de la carrera | listado público (`obtenerPrehorarios()` + `elegirPrehorarioCarrera()`) |
 
 El calendario se busca **dentro de las vacaciones de fin de clases**: desde el
 **último día de clases del periodo en curso** (`fechaFinDeClases`, p. ej.
 11-dic-2026) hasta el **inicio de labores del ciclo siguiente**
 (`fechaInicioLabores`, p. ej. 6-ene-2027). Dentro de esa ventana el chequeo
-corre **a las 18:00** a lo sumo **cada 7 días** y elige el primer `*calendario*`
-del listado; al detectar uno nuevo lo aplica **silenciosamente** (sin toast) y
-guarda el estado para no reprocesarlo. No hay ventanas anuales ni límite de
-antigüedad sobre el archivo.
+corre **a las 18:00** a lo sumo **cada 7 días** y consulta la página oficial
+(`obtenerCalendarioOficial()`); al detectar un calendario nuevo lo aplica
+**silenciosamente** (sin toast) y guarda el estado para no reprocesarlo. No hay
+ventanas anuales ni límite de antigüedad sobre el archivo.
 
 ### Máquina de fases (`src/lib/busquedaHorarios.ts`, lógica pura)
 
 | Fase | Cuándo toca | Qué hace | Estado |
 | --- | --- | --- | --- |
-| `procesar-calendario` | hay calendario visto sin procesar (o coincide con el listado) | lee el PDF; guarda inicio de labores, **fin de clases** y fecha de publicación de prehorarios (actividad 5) | ✅ |
-| `buscar-calendario` | dentro de la ventana vacacional | consulta listado (mínimo 7 días entre consultas); archivo nuevo → `calendarioVisto` **silencioso** | ✅ |
+| `procesar-calendario` | hay calendario visto sin procesar (o coincide con la página oficial) | lee el PDF; guarda inicio de labores, **fin de clases** y fecha de publicación de prehorarios (actividad 5) | ✅ |
+| `buscar-calendario` | dentro de la ventana vacacional | consulta la página oficial (mínimo 7 días entre consultas); calendario nuevo → `calendarioVisto` **silencioso** | ✅ |
 | `esperar-prehorario` | fuera de vacaciones, con fecha en mano | espera a la fecha de la actividad 5 (fallback: labores + `diasTrasLabores`) | ✅ |
 | `buscar-prehorario` | fecha cumplida | consulta listado; prehorario de la carrera nuevo → aviso | ✅ |
 | `completado` | prehorario visto | no hace nada más en este ciclo | ✅ |
@@ -45,7 +45,7 @@ antigüedad sobre el archivo.
 
 | Constante | Valor | Significado |
 | --- | --- | --- |
-| `CONFIG_CHEQUEO_HORARIOS.diasEntreBusquedasCalendario` | **7 días** | cadencia mínima entre consultas del listado dentro de la ventana vacacional |
+| `CONFIG_CHEQUEO_HORARIOS.diasEntreBusquedasCalendario` | **7 días** | cadencia mínima entre consultas de la página oficial dentro de la ventana vacacional |
 | `CONFIG_CHEQUEO_HORARIOS.diasTrasLabores` | **1 día** | espera tras inicio de labores solo si falta la actividad 5 |
 | `CONFIG_CHEQUEO_HORARIOS.horaChequeo` (`HORA_CHEQUEO`) | **18 (18:00)** | momento del bucle diario (si la app está abierta) |
 | Ventana vacacional | `[fechaFinDeClases, fechaInicioLabores)` | delimita la búsqueda del calendario del ciclo siguiente |
@@ -109,17 +109,19 @@ después de que debería estar publicado.
 
 ---
 
-## 4. Calendario del ciclo siguiente (búsqueda por listado en vacaciones)
+## 4. Calendario del ciclo siguiente (búsqueda por página oficial en vacaciones)
 
 - **No existen ventanas anuales** (15-dic / 15-mayo fueron descartadas). La
   búsqueda del calendario del ciclo siguiente corre **desde el fin de clases**
   del periodo en curso hasta el **inicio de labores** del siguiente — decisión
   del dueño, 2026-09-08.
-- **No existe un archivo «SIG»**: la detección es por el **primer `*calendario*`
-  del listado** `documentos/?C=M;O=D` (el más reciente del orden del servidor),
-  con una consulta a lo sumo cada **7 días** y **sin límite de antigüedad** sobre
-  el archivo. Al detectar uno distinto al ya procesado se aplica y el ciclo de
-  prehorario se reinaugura.
+- **El calendario sale de la página oficial** `calendario-escolar.html`
+  (`obtenerCalendarioOficial()`, vía mirror): se toma el PDF vigente que el
+  webmaster dejó embebido (`parseCalendarioOficial` elige el de mayor año), con
+  una consulta a lo sumo cada **7 días**. **No se usa el listado para el
+  calendario** (revocado 2026-09-10: el listado ignoraba `?C=M;O=D`, elegía el
+  calendario 2024 y las fechas volvían vacías). Al detectar uno distinto al ya
+  procesado se aplica y el ciclo de prehorario se reinaugura.
 - Si el estado no tiene las fechas (instalación nueva o usuarias/os migrados del
   esquema de ventanas), se completan **on-demand** (`obtenerDatosCalendario()`).
 
@@ -215,14 +217,16 @@ del PDF — `CreationDate` — y el orden del listado
 
 Observaciones útiles para revisar el chequeo diario:
 
-- **El calendario no anuncia su propia publicación**: el nombre cambia al
-  actualizarse y la fecha real se ve en el orden del listado (`?C=M;O=D`), no en
-  el contenido del PDF. Por eso se busca por **primer `*calendario*` del
-  listado** dentro de la ventana vacacional. El patrón «el calendario se elabora
-  ~3 meses antes» era incorrecto: 2026-1 salió **26-ene-2026, ya iniciadas las
-  labores**, y 2026-2 salió **29-may-2026** (día del fin de clases). No hay
-  patrón estable — el listado cubre cualquier fecha, la cadencia la pone el
-  chequeo (7 días).
+- **El calendario no anuncia su propia publicación**: el webmaster reemplaza el
+  PDF embebido en la página oficial cuando publica el del siguiente ciclo, y la
+  página **no** refleja el orden del listado (`?C=M;O=D`). Por eso el chequeo
+  consulta **la página oficial** (`obtenerCalendarioOficial()`), cuya página
+  apunta al PDF vigente, dentro de la ventana vacacional — **no el listado**
+  (que en 2026-09 ignoraba la ordenación y entregaba el calendario de 2024).
+  El patrón «el calendario se elabora ~3 meses antes» era incorrecto: 2026-1
+  salió **26-ene-2026, ya iniciadas las labores**, y 2026-2 salió
+  **29-may-2026** (día del fin de clases). No hay patrón estable — la cadencia
+  la pone el chequeo (7 días).
 - El **prehorario** salió el **9 de enero** = inicio de labores (7 ene) + 2. El
   disparo actual usa la **fecha de la actividad 5** (9 ene), no adivinar con
   labores + N. Esa misma fecha dispara el aviso de **turnos de reinscripción**

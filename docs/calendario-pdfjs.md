@@ -5,18 +5,21 @@ Fecha: 2026-09-06 · Rama: `test/sugerir-horario`
 Notas de lo que falló al probar «consultar calendario» y por qué quedó así.
 Sirven para recordar el razonamiento sin re-descubrirlo.
 
-> **Actualización 2026-09-08 (decisión del dueño):** la §1 quedó **superada**.
-> La búsqueda del calendario del **ciclo siguiente vuelve al listado**
-> (`elegirCalendario`, primer `*calendario*` en `documentos/?C=M;O=D` sin
-> ventana de días), pero limitada a la **ventana vacacional** (fin de clases →
-> inicio de labores), con cadencia de 7 días y aplicación **silenciosa**. El
-> flujo por la página oficial se **eliminó por completo** (ya no hay
-> `obtenerCalendarioOficial` ni harness que la consulte). Detalle del ciclo
-> completo: `docs/sugerir-horario.md` §1/§4.
+> **Actualización 2026-09-10 (decisión del dueño):** la decisión del
+> 2026-09-08 se **revierte** y esta §1 vuelve a estar vigente: el calendario
+> sale **solo** de la página oficial `calendario-escolar.html` (vía mirror
+> `https://api.marcosochoa.dev/ith/`), nunca del listado. El listado ignoraba
+> `?C=M;O=D` (orden alfabético), elegía el calendario 2024 y las fechas
+> volvían vacías. `elegirCalendario`/`esCalendario` se eliminan;
+> `obtenerCalendarioOficial`, `parseCalendarioOficial` e
+> `interpretarFuenteCalendario` operan contra la página oficial. El prehorario
+> de la carrera sí sigue usando el listado (`elegirPrehorarioCarrera`): ahí no
+> hay una página oficial dedicada. Detalle: `docs/sugerir-horario.md` §1 y
+> ROADMAP.MD §17.
 
 ---
 
-## 1. El calendario salía del listado de documentos, no de la página oficial
+## 1. El calendario sale de la página oficial, no del listado
 
 ### Qué estaba mal
 
@@ -28,18 +31,18 @@ tenía DOS fuentes mezcladas:
 | Página oficial `ith.mx/calendario-escolar.html` | `obtenerCalendarioOficial()` extrae el PDF incrustado (`<embed src>` / `ul.doc a`). |
 | Listado público `ith.mx/documentos/?C=M;O=D` | `elegirCalendario()` buscaba archivos llamados `*calendario*.pdf`, ordenados por fecha de modificación, y elegía el más reciente dentro de una ventana de 7 días. |
 
-La decisión de producto de ese momento fue: **el calendario se saca de la
-página oficial**. El listado de documentos es una conjetura: depende del
-nombre del archivo, de su mtime y de una ventana arbitraria; no refleja lo que
-el instituto realmente publicó en la página oficial. Podía elegir un PDF viejo,
-uno de otra página, o no elegir nada.
+La decisión de producto es: **el calendario se saca de la página oficial**.
+El listado de documentos es una conjetura: depende del nombre del archivo, de
+su mtime y de una ventana arbitraria; no refleja lo que el instituto
+realmente publicó en la página oficial. Podía elegir un PDF viejo, uno de
+otra página, o no elegir nada.
 
-> Revisado 2026-09-08: con la búsqueda confinada a las **vacaciones** (no a
-> ventanas arbitrarias sobre el mtime), la conjetura del listado vuelve a ser
-> aceptable y es la única fuente viable para detectar el calendario del ciclo
-> siguiente (la página oficial acabó siendo inaccesible en producción; ver
-> `ROADMAP.MD` §17 transporte). La ventana de 7 días sobre el archivo ya **no**
-> existe: la cadencia la controla el chequeo (cada 7 días, decisión del dueño).
+> Revisado 2026-09-08 y **revocado 2026-09-10**: el 2026-09-08 se movió la
+> búsqueda del calendario del ciclo siguiente al listado (confinada a las
+> vacaciones, cadencia de 7 días, decisión del dueño); en 2026-09-10 el dueño
+> pidió revertir: el listado ignoraba `?C=M;O=D` (orden alfabético) y
+> `elegirCalendario` elegía el calendario 2024 — las fechas volvían vacías.
+> El calendario vuelve a salir **solo** de `calendario-escolar.html`.
 
 ### Cómo se detectó
 
@@ -52,20 +55,29 @@ la página oficial.
 - `src/lib/prehorario.ts`
   - En su momento se eliminaron `elegirCalendario`, `ResultadoCalendario`,
     `CandidatoCalendario` y `esCalendario` (código muerto).
-  - **2026-09-08:** `elegirCalendario` y `esCalendario` vuelven
-    (`lib/prehorario.ts`), para la detección del calendario del ciclo siguiente
-    por listado durante las vacaciones.
-  - **2026-09-08:** se **eliminaron** `obtenerCalendarioOficial()`,
-    `parseCalendarioOficial()` e `interpretarFuenteCalendario()` (ya no se usa
-    la página oficial).
+  - **2026-09-08:** `elegirCalendario` y `esCalendario` volvieron para la
+    detección por listado; `obtenerCalendarioOficial()`, `parseCalendarioOficial()`
+    e `interpretarFuenteCalendario()` se eliminaron.
+  - **2026-09-10:** se revierte. `elegirCalendario`/`esCalendario` se eliminan
+    definitivamente; `obtenerCalendarioOficial()`, `parseCalendarioOficial()` e
+    `interpretarFuenteCalendario()` operan contra
+    `https://api.marcosochoa.dev/ith/calendario-escolar.html` (mirror con CORS,
+    sin proxy). `interpretarFuenteCalendario` resuelve las rutas relativas
+    contra esa página y solo acepta su origin + `.pdf`; `parseCalendarioOficial`
+    lee `<embed src>` y `ul.doc a[href]` y elige el de mayor año.
   - El prehorario sigue usando el listado (`elegirPrehorarioCarrera`): ahí no
     hay una página oficial dedicada, el listado es la fuente correcta.
+- `src/lib/calendarioLabores.ts`
+  - El extractor **tolera el espaciado letra a letra** del PDF («P E R IODO»,
+    «F i n de cl as es», «20 26») y `extraerFinDeClases` ahora compara **todas**
+    las filas de «fin de clases» (licenciatura vs idiomas), no solo la primera.
 - `src/features/devtools/components/PruebaCompletaSection.tsx`
-  - El paso 1 del pipeline («Calendario (listado)») usa `obtenerPrehorarios()` +
-    `elegirCalendario()`, el mismo mecanismo del chequeo diario.
-- `src/lib/prehorario.test.ts` — test de `esCalendario` / `elegirCalendario`
-  (re-incorporados 2026-09-08).
-- `ROADMAP.MD` §17 — la detección del calendario vuelve al listado (vacaciones).
+  - El paso 1 del pipeline («Calendario (página oficial)») usa
+    `obtenerCalendarioOficial()`, el mismo mecanismo del chequeo diario; el
+    listado queda solo para prehorarios (paso 3).
+- `src/lib/prehorario.test.ts` — tests de `interpretarFuenteCalendario`
+  (restaurados 2026-09-10); se retiran los de `esCalendario`/`elegirCalendario`.
+- `ROADMAP.MD` §17 — el calendario vuelve a salir de la página oficial.
 
 ---
 
@@ -160,9 +172,12 @@ del PDF.
 
 ## Referencias
 
-- Listado de documentos: https://ith.mx/documentos/?C=M;O=D (calendario del
-  ciclo siguiente y prehorario de la carrera)
+- Página oficial del calendario: `https://api.marcosochoa.dev/ith/calendario-escolar.html`
+  (mirror de `ith.mx/calendario-escolar.html`)
+- Listado de documentos: `https://api.marcosochoa.dev/ith/documentos/?C=M;O=D`
+  (prehorario de la carrera; el calendario ya NO sale de aquí)
 - `src/lib/calendarioLabores.ts` — lectura del PDF, worker e interpretación de
-  fechas (labores, actividad 5, fin de clases).
-- `src/lib/prehorario.ts` — `elegirCalendario()` (detección por listado),
-  prehorario vía `obtenerPrehorarios()`.
+  fechas (labores, actividad 5, fin de clases; tolerante al espaciado por letras).
+- `src/lib/prehorario.ts` — `obtenerCalendarioOficial()` /
+  `parseCalendarioOficial()` / `interpretarFuenteCalendario()` (página oficial),
+  prehorario vía `obtenerPrehorarios()` + `elegirPrehorarioCarrera()`.

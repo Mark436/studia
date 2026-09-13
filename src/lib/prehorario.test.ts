@@ -1,18 +1,17 @@
 import { describe, expect, test } from "vitest";
 import {
-  elegirCalendario,
   elegirPrehorarioCarrera,
-  esCalendario,
   esFechaDentroVentana,
   esPrehorario,
   esProgramacion,
   extraerAnio,
   extraerNombreArchivo,
+  interpretarFuenteCalendario,
   parseFechaModificacion,
   urlDocumento,
   urlPrehorario,
 } from "./prehorario";
-import type { ArchivoListado, ResultadoPrehorarios } from "./prehorario";
+import type { ResultadoPrehorarios } from "./prehorario";
 
 const CARRERA = "ING. SIS. COMP.";
 
@@ -337,44 +336,29 @@ describe("urlDocumento", () => {
   });
 });
 
-describe("esCalendario / elegirCalendario", () => {
-  const entrada = (archivo: string): ArchivoListado => ({
-    archivo,
-    modificado: new Date(2026, 8, 5, 15, 3),
+describe("interpretarFuenteCalendario", () => {
+  test("ruta relativa como la deja calendario-escolar.html", () => {
+    const oficial = interpretarFuenteCalendario(
+      "documentos/CALENDARIO_ESCOLAR_2026-2 v2.pdf",
+    );
+    expect(oficial?.archivo).toBe("CALENDARIO_ESCOLAR_2026-2 v2.pdf");
+    expect(oficial?.url).toBe(
+      "https://api.marcosochoa.dev/ith/documentos/CALENDARIO_ESCOLAR_2026-2%20v2.pdf",
+    );
   });
 
-  test("esCalendario distingue el calendario de otros documentos", () => {
-    expect(esCalendario("CALENDARIO_ESCOLAR_2026-2 V2.pdf")).toBe(true);
-    expect(esCalendario("CALENDARIO_ESCOLAR_2026-2.pdf")).toBe(true);
-    expect(esCalendario("PREHORARIO_INGENIERIA_EN_SISTEMAS_2026-2.pdf")).toBe(false);
-    expect(esCalendario("PROGRAMACION_X_2026-2_alum.pdf")).toBe(false);
+  test("ruta absoluta del mismo origin", () => {
+    const oficial = interpretarFuenteCalendario(
+      "https://api.marcosochoa.dev/ith/documentos/CALENDARIO_ESCOLAR_2026-2_v1.pdf",
+    );
+    expect(oficial?.archivo).toBe("CALENDARIO_ESCOLAR_2026-2_v1.pdf");
   });
 
-  test("elegirCalendario toma el primero del orden del listado (más reciente primero)", () => {
-    const elegido = elegirCalendario([
-      entrada("PREHORARIO_INGENIERIA_EN_SISTEMAS_2026-2.pdf"),
-      entrada("CALENDARIO_ESCOLAR_2026-2 V2.pdf"),
-      entrada("OTRO_DOCUMENTO.pdf"),
-    ]);
-    expect(elegido?.archivo).toBe("CALENDARIO_ESCOLAR_2026-2 V2.pdf");
-  });
-
-  test("sin calendario en el listado devuelve null", () => {
+  test("rechaza fuentes fuera del origin o sin .pdf", () => {
     expect(
-      elegirCalendario([
-        entrada("PREHORARIO_INGENIERIA_EN_SISTEMAS_2026-2.pdf"),
-        entrada("PROGRAMACION_X_2026-2_alum.pdf"),
-      ]),
+      interpretarFuenteCalendario("https://otro-sitio.mx/toys/a.pdf"),
     ).toBeNull();
-    expect(elegirCalendario([])).toBeNull();
-  });
-
-  test("elige el calendario aunque no sea el primer archivo del listado", () => {
-    const elegido = elegirCalendario([
-      { archivo: "PROGRAMACION_ISC_2026-2_alum.pdf", modificado: null },
-      { archivo: "CALENDARIO_ESCOLAR_2027-1.pdf", modificado: null },
-    ]);
-    expect(elegido?.archivo).toBe("CALENDARIO_ESCOLAR_2027-1.pdf");
+    expect(interpretarFuenteCalendario("documentos/NOTAS_SESION.md")).toBeNull();
   });
 });
 
