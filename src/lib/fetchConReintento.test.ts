@@ -34,7 +34,7 @@ describe("fetchConReintento", () => {
     const fetch = vi.fn().mockResolvedValue(OK());
     vi.stubGlobal("fetch", fetch);
 
-    const res = await fetchConReintento("https://api.marcosochoa.dev/ith/x.pdf");
+    const res = await fetchConReintento("https://api.marcosochoa.dev/studia-proxy/x.pdf");
 
     expect(res.status).toBe(200);
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -47,7 +47,7 @@ describe("fetchConReintento", () => {
       .mockResolvedValueOnce(OK());
     vi.stubGlobal("fetch", fetch);
 
-    const res = await fetchConReintento("https://api.marcosochoa.dev/ith/x.pdf");
+    const res = await fetchConReintento("https://api.marcosochoa.dev/studia-proxy/x.pdf");
 
     expect(res.status).toBe(200);
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -57,7 +57,7 @@ describe("fetchConReintento", () => {
     const fetch = vi.fn().mockResolvedValue(rateLimited());
     vi.stubGlobal("fetch", fetch);
 
-    const res = await fetchConReintento("https://api.marcosochoa.dev/ith/x.pdf");
+    const res = await fetchConReintento("https://api.marcosochoa.dev/studia-proxy/x.pdf");
 
     expect(res.status).toBe(429);
     expect(fetch).toHaveBeenCalledTimes(3);

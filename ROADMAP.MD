@@ -444,7 +444,7 @@ antes de la inscripción.
   (restaurado 2026-09-10; **revierte la decisión del 2026-09-08** de usar el
   listado — el listado ignoraba `?C=M;O=D`, elegía el calendario 2024 y las
   fechas volvían vacías): el chequeo consulta `calendario-escolar.html` (vía
-  mirror `https://api.marcosochoa.dev/ith/`) a lo sumo cada 7 días y toma el
+  mirror `https://api.marcosochoa.dev/studia-proxy/`) a lo sumo cada 7 días y toma el
   calendario vigente embebido (`obtenerCalendarioOficial` /
   `parseCalendarioOficial` en `src/lib/prehorario.ts`). Al detectar uno
   distinto al procesado lo aplica **silenciosamente** (sin toast). Sin
@@ -508,7 +508,7 @@ antes de la inscripción.
   es inalcanzable desde el datacenter de Netlify (ETIMEDOUT), pero el repositorio
   completo (`/documentos/` con CORS y `?C=M;O=D`, PDFs, y
   `ith.mx/calendario-escolar.html`) está espejado en
-  `https://api.marcosochoa.dev/ith/`. Se eliminaron el proxy
+  `https://api.marcosochoa.dev/studia-proxy/`. Se eliminaron el proxy
   `netlify/functions/ith-proxy.mts` y las rutas `/api/ith`, `/documentos` y
   `/calendario-escolar.html` de `vite.config.ts`; `prehorario.ts` y
   `pdfTexto.ts` apuntan directo al espejo. No hace falta relay en producción.

@@ -18,7 +18,7 @@ documentos):
 
 | Publicación | Fuente |
 | --- | --- |
-| Calendario del ciclo siguiente | página oficial `calendario-escolar.html` vía mirror `https://api.marcosochoa.dev/ith/` — calendario vigente embebido (`obtenerCalendarioOficial()`) |
+| Calendario del ciclo siguiente | página oficial `calendario-escolar.html` vía mirror `https://api.marcosochoa.dev/studia-proxy/` — calendario vigente embebido (`obtenerCalendarioOficial()`) |
 | Prehorario de la carrera | listado público (`obtenerPrehorarios()` + `elegirPrehorarioCarrera()`) |
 
 El calendario se busca **dentro de las vacaciones de fin de clases**: desde el

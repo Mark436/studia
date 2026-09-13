@@ -99,10 +99,10 @@ describe("urlPrehorario", () => {
     expect(
       urlPrehorario("PREHORARIO_INGENIERIA_EN_SISTEMAS_COMPUTACIONALES_2026-2.pdf"),
     ).toBe(
-      "https://api.marcosochoa.dev/ith/documentos/PREHORARIO_INGENIERIA_EN_SISTEMAS_COMPUTACIONALES_2026-2.pdf",
+      "https://api.marcosochoa.dev/studia-proxy/documentos/PREHORARIO_INGENIERIA_EN_SISTEMAS_COMPUTACIONALES_2026-2.pdf",
     );
     expect(urlPrehorario("PREHORARIO X 2026-1.pdf")).toBe(
-      "https://api.marcosochoa.dev/ith/documentos/PREHORARIO%20X%202026-1.pdf",
+      "https://api.marcosochoa.dev/studia-proxy/documentos/PREHORARIO%20X%202026-1.pdf",
     );
   });
 });
@@ -331,7 +331,7 @@ describe("parseFechaModificacion", () => {
 describe("urlDocumento", () => {
   test("construye el URL canónico", () => {
     expect(urlDocumento("CALENDARIO_ESCOLAR_2026-2 v2.pdf")).toBe(
-      "https://api.marcosochoa.dev/ith/documentos/CALENDARIO_ESCOLAR_2026-2%20v2.pdf",
+      "https://api.marcosochoa.dev/studia-proxy/documentos/CALENDARIO_ESCOLAR_2026-2%20v2.pdf",
     );
   });
 });
@@ -343,13 +343,13 @@ describe("interpretarFuenteCalendario", () => {
     );
     expect(oficial?.archivo).toBe("CALENDARIO_ESCOLAR_2026-2 v2.pdf");
     expect(oficial?.url).toBe(
-      "https://api.marcosochoa.dev/ith/documentos/CALENDARIO_ESCOLAR_2026-2%20v2.pdf",
+      "https://api.marcosochoa.dev/studia-proxy/documentos/CALENDARIO_ESCOLAR_2026-2%20v2.pdf",
     );
   });
 
   test("ruta absoluta del mismo origin", () => {
     const oficial = interpretarFuenteCalendario(
-      "https://api.marcosochoa.dev/ith/documentos/CALENDARIO_ESCOLAR_2026-2_v1.pdf",
+      "https://api.marcosochoa.dev/studia-proxy/documentos/CALENDARIO_ESCOLAR_2026-2_v1.pdf",
     );
     expect(oficial?.archivo).toBe("CALENDARIO_ESCOLAR_2026-2_v1.pdf");
   });

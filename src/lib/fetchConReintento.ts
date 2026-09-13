@@ -1,4 +1,5 @@
-// Fetch a los documentos del instituto (`api.marcosochoa.dev/ith`) con manejo
+// Fetch a los documentos del instituto (`api.marcosochoa.dev/studia-proxy`)
+// con manejo
 // de rate-limit. El espejo limita a 30 peticiones por usuario cada 10 segundos
 // (HTTP 429); cada cliente tiene su propio presupuesto, así que lo único que
 // hace falta es no reactivar al instante: ante un 429 se espera el `Retry-After`

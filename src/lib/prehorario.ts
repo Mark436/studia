@@ -17,7 +17,7 @@ export interface ResultadoPrehorarios {
   todos?: ArchivoListado[];
 }
 
-const ITH_API_BASE = "https://api.marcosochoa.dev/ith";
+const ITH_API_BASE = "https://api.marcosochoa.dev/studia-proxy";
 const FETCH_URL = `${ITH_API_BASE}/documentos/?C=M;O=D`;
 
 /**

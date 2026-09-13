@@ -8,7 +8,7 @@ Sirven para recordar el razonamiento sin re-descubrirlo.
 > **Actualización 2026-09-10 (decisión del dueño):** la decisión del
 > 2026-09-08 se **revierte** y esta §1 vuelve a estar vigente: el calendario
 > sale **solo** de la página oficial `calendario-escolar.html` (vía mirror
-> `https://api.marcosochoa.dev/ith/`), nunca del listado. El listado ignoraba
+> `https://api.marcosochoa.dev/studia-proxy/`), nunca del listado. El listado ignoraba
 > `?C=M;O=D` (orden alfabético), elegía el calendario 2024 y las fechas
 > volvían vacías. `elegirCalendario`/`esCalendario` se eliminan;
 > `obtenerCalendarioOficial`, `parseCalendarioOficial` e
@@ -61,7 +61,7 @@ la página oficial.
   - **2026-09-10:** se revierte. `elegirCalendario`/`esCalendario` se eliminan
     definitivamente; `obtenerCalendarioOficial()`, `parseCalendarioOficial()` e
     `interpretarFuenteCalendario()` operan contra
-    `https://api.marcosochoa.dev/ith/calendario-escolar.html` (mirror con CORS,
+    `https://api.marcosochoa.dev/studia-proxy/calendario-escolar.html` (mirror con CORS,
     sin proxy). `interpretarFuenteCalendario` resuelve las rutas relativas
     contra esa página y solo acepta su origin + `.pdf`; `parseCalendarioOficial`
     lee `<embed src>` y `ul.doc a[href]` y elige el de mayor año.
@@ -172,9 +172,9 @@ del PDF.
 
 ## Referencias
 
-- Página oficial del calendario: `https://api.marcosochoa.dev/ith/calendario-escolar.html`
+- Página oficial del calendario: `https://api.marcosochoa.dev/studia-proxy/calendario-escolar.html`
   (mirror de `ith.mx/calendario-escolar.html`)
-- Listado de documentos: `https://api.marcosochoa.dev/ith/documentos/?C=M;O=D`
+- Listado de documentos: `https://api.marcosochoa.dev/studia-proxy/documentos/?C=M;O=D`
   (prehorario de la carrera; el calendario ya NO sale de aquí)
 - `src/lib/calendarioLabores.ts` — lectura del PDF, worker e interpretación de
   fechas (labores, actividad 5, fin de clases; tolerante al espaciado por letras).

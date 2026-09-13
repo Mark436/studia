@@ -11,11 +11,11 @@ import { fetchConReintento } from "@/lib/fetchConReintento";
 
 /**
  * URL para descargar un PDF del repositorio del instituto (calendario,
- * prehorario, programación, …). `api.marcosochoa.dev` replica el repositorio
- * de `ith.mx` con CORS habilitado, así que no hace falta proxy.
+ * prehorario, programación, …). `api.marcosochoa.dev/studia-proxy` replica el
+ * repositorio de `ith.mx` con CORS habilitado, así que no hace falta proxy.
  */
 export function urlDocumentoPdf(archivo: string): string {
-  return `https://api.marcosochoa.dev/ith/documentos/${encodeURIComponent(archivo)}`;
+  return `https://api.marcosochoa.dev/studia-proxy/documentos/${encodeURIComponent(archivo)}`;
 }
 
 /**
