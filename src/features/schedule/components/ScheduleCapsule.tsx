@@ -179,7 +179,7 @@ export function ScheduleCapsule({
         }
         expanded={
           notification.detail ? (
-            <span className="truncate font-display text-capsule-display font-bold leading-tight text-on-surface">
+            <span className="truncate text-capsule-caption font-medium text-on-surface-variant">
               {notification.detail}
             </span>
           ) : null
@@ -290,7 +290,7 @@ if (state.kind === "in-class") {
                 </span>
               ) : null}
             </span>
-            <span className="motion-safe:animate-[studia-capsule-in_0.35s_var(--ease-out-soft)] whitespace-nowrap overflow-hidden text-capsule-body font-medium text-on-surface">
+            <span className="motion-safe:animate-[studia-capsule-in_0.35s_var(--ease-out-soft)] overflow-hidden text-capsule-body font-medium text-on-surface">
               {state.subjectName}
             </span>
           </span>
@@ -328,7 +328,7 @@ const classroomLabel = formatClassroomLabel(state.classroom);
           </span>
         </span>
       }
-      minimizedExpanded={
+minimizedExpanded={
         <span className="flex min-w-0 flex-col gap-capsule-gap leading-tight">
           <span className="flex items-baseline gap-capsule-gap-lg">
             <DurationCounter minutes={state.minutesUntil} size="lg" />

@@ -11,7 +11,7 @@ export function LoginPage() {
         <header className="mb-6 text-center">
           <span
             aria-hidden="true"
-            className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[16px] bg-primary text-xl font-bold text-on-primary elevated"
+            className="mx-auto mb-4 flex h-icon-2xl w-icon-2xl items-center justify-center rounded-2xl bg-primary text-xl font-bold text-on-primary elevated"
           >
             S
           </span>

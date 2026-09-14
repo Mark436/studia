@@ -183,6 +183,17 @@ class DevTestEnvironmentImpl {
     this.notify();
   }
 
+  removeAviso(titulo: string, mensaje: string): void {
+    if (!this.mockAppData) return;
+    this.mockAppData = {
+      ...this.mockAppData,
+      avisos: this.mockAppData.avisos.filter(
+        (aviso) => aviso.titulo !== titulo || aviso.mensaje !== mensaje,
+      ),
+    };
+    this.notify();
+  }
+
   setAdeudos(adeudos: Alumno["adeudos"]): void {
     if (!this.mockAppData) return;
     this.mockAppData = {

@@ -1,17 +1,17 @@
 import type { BottomNavigationItem } from "@/components/layout/BottomNavigation";
 import {
-  BellIcon,
   CalendarIcon,
   ClipboardListIcon,
+  TreeIcon,
   UserIcon,
 } from "@/components/ui/icons";
 
-export type TabId = "schedule" | "grades" | "student" | "notifications";
+export type TabId = "schedule" | "grades" | "reticula" | "student";
 
 export const NAV_ITEMS: ReadonlyArray<BottomNavigationItem<TabId>> = [
   { id: "schedule", label: "Horario", icon: <CalendarIcon size={22} /> },
   { id: "grades", label: "Calificaciones", icon: <ClipboardListIcon size={22} /> },
-  { id: "notifications", label: "Avisos", icon: <BellIcon size={22} /> },
+  { id: "reticula", label: "Retícula", icon: <TreeIcon size={22} /> },
   { id: "student", label: "Alumno", icon: <UserIcon size={22} /> },
 ];
 

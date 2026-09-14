@@ -15,7 +15,7 @@ import { ReAuthSheet } from "@/features/auth/components/ReAuthSheet";
 import { toDateKey } from "@/features/auth/utils";
 import { GradesPage } from "@/features/grades/GradesPage";
 import { shouldOpenGradesFirst } from "@/features/grades/utils";
-import { NotificationsPage } from "@/features/notifications/NotificationsPage";
+import { ReticulaPage } from "@/features/reticula/ReticulaPage";
 import { getNextClassInfo } from "@/features/schedule/capsuleState";
 import { ScheduleStateProvider } from "@/features/schedule/ScheduleStateProvider";
 import { useScheduleState } from "@/features/schedule/scheduleStateContext";
@@ -477,8 +477,8 @@ function AuthenticatedShell() {
               />
             ) : activeKey === "grades" ? (
               <GradesPage alumno={effectiveAlumno} />
-            ) : activeKey === "notifications" ? (
-              <NotificationsPage alumno={effectiveAlumno} />
+            ) : activeKey === "reticula" ? (
+              <ReticulaPage alumno={effectiveAlumno} />
             ) : (
               <StudentPage
                 alumno={effectiveAlumno}

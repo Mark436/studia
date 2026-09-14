@@ -17,8 +17,8 @@ function materia(
     coordenadas: { x, y: 1 },
     codigoEstado,
     estado: String(codigoEstado) as ReticulaMateria["estado"],
-    c: codigoEstado,
-    g: 0,
+    anteriores: [],
+    siguientes: [],
     seriacion,
   };
 }

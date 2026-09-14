@@ -7,7 +7,7 @@ import { DEFAULT_TOAST_DURATION_MS } from "./toastVariants";
 const FADE_OUT_MS = 200;
 
 const VARIANT_CLASSES: Record<ToastVariant, string> = {
-  neutral: "glass-panel text-on-surface",
+  neutral: "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-300",
   success: "bg-success/95 text-on-success",
   error: "bg-error/95 text-on-error",
 } as const;

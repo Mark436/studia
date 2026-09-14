@@ -38,6 +38,7 @@ export interface DevTestEnvironmentInterface {
   addMateria(materia: MockMateria): void;
   removeMateria(clave: string): void;
   addAviso(aviso: Aviso): void;
+  removeAviso(titulo: string, mensaje: string): void;
   setAdeudos(adeudos: Alumno["adeudos"]): void;
   setAdeudosPresent(present: boolean): void;
   setMockReinscripcionDate(iso: string | null): void;

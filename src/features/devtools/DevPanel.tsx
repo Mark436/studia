@@ -7,6 +7,7 @@ import type { Alumno } from "@/lib/api/client";
 import type { NotificationDraft } from "@/lib/notifications/capsuleEvents";
 import { useDevTestEnvironment } from "@/lib/devtest/provider";
 import { AdeudosSection } from "./components/AdeudosSection";
+import { AvisosSection } from "./components/AvisosSection";
 import { ClockSection } from "./components/ClockSection";
 import { GradesSection } from "./components/GradesSection";
 import { InteractionSection } from "./components/InteractionSection";
@@ -154,23 +155,7 @@ export function DevPanel({
           <div className="border-t border-outline-variant pt-4" />
           <ReinscripcionSection />
           <div className="border-t border-outline-variant pt-4" />
-
-          <section className="flex flex-col gap-3">
-            <h4 className="text-sm font-semibold text-on-surface">Avisos</h4>
-            <Button
-              variant="secondary"
-              onClick={() =>
-                env.addAviso({
-                  titulo: "Aviso de prueba",
-                  mensaje: "Este es un aviso simulado desde el modo dev",
-                  tipo: "info",
-                })
-              }
-              className="h-9 w-full"
-            >
-              Agregar aviso de prueba
-            </Button>
-          </section>
+          <AvisosSection />
         </>
       ) : (
         <p className="text-xs text-on-surface-variant">

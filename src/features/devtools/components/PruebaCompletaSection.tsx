@@ -156,7 +156,8 @@ export function PruebaCompletaSection({
       // PASO 6: Sugerencia de horario
       actualizarPaso("sugerenciaHorario", { estado: "running" });
       const t6 = performance.now();
-      const disponibles = getMateriasDisponibles(alumno.reticula);
+      const reticula = alumno.semestres.flat();
+      const disponibles = getMateriasDisponibles(reticula);
       const sugerencia = calcularSugerenciaHorario(disponibles, prehorarioJson);
       actualizarPaso("sugerenciaHorario", {
         estado: "success",
@@ -334,22 +335,29 @@ export function PruebaCompletaSection({
         {renderPaso(
           "6. Sugerencia de horario (menos huecos)",
           state.sugerenciaHorario,
-          (d) =>
-            d.materias.length > 0
-              ? `✅ ${d.materias.length} materias cubiertas (${d.huecosMinutos} min huecos)\n\n` +
-                d.materias
-                  .map(
-                    (m) =>
-                      `${m.clave} ${m.nombre}\n` +
-                      `  Grupo: ${m.grupo} | Prof: ${m.maestro ?? "—"}\n` +
-                      `  Horario: ${formatearHorario(m.horario)}`,
-                  )
-                  .join("\n\n") +
-                (d.excluidas.length > 0
-                  ? `\n\n❌ Excluidas (${d.excluidas.length}):\n` +
-                    d.excluidas.map((e) => `  ${e.clave} ${e.nombre} — ${e.razon}`).join("\n")
-                  : "")
-              : "Sin materias disponibles",
+          (d) => {
+            const cuerpo =
+              d.materias.length > 0
+                ? `✅ ${d.materias.length} materias cubiertas (${d.huecosMinutos} min huecos)\n\n` +
+                  d.materias
+                    .map(
+                      (m) =>
+                        `${m.clave} ${m.nombre}\n` +
+                        `  Grupo: ${m.grupo} | Prof: ${m.maestro ?? "—"}\n` +
+                        `  Horario: ${formatearHorario(m.horario)}`,
+                    )
+                    .join("\n\n")
+                : "Sin materias disponibles";
+            return (
+              cuerpo +
+              (d.excluidas.length > 0
+                ? `\n\n❌ Excluidas (${d.excluidas.length}):\n` +
+                  d.excluidas
+                    .map((e) => `  ${e.clave} ${e.nombre} — ${e.razon}`)
+                    .join("\n")
+                : "")
+            );
+          },
         )}
       </Card>
     </section>

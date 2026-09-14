@@ -12,11 +12,16 @@ describe("retrasoRetryAfter", () => {
   });
 
   test("interpreta una fecha HTTP", () => {
-    const objetivo = new Date(Date.now() + 60_000);
-    const retraso = retrasoRetryAfter(objetivo.toUTCString());
-    expect(retraso).not.toBeNull();
-    expect(retraso as number).toBeGreaterThan(59_800);
-    expect(retraso as number).toBeLessThan(60_200);
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-01-01T10:00:00Z"));
+      const objetivo = new Date(Date.now() + 60_000);
+      const retraso = retrasoRetryAfter(objetivo.toUTCString());
+      expect(retraso).not.toBeNull();
+      expect(retraso as number).toBe(60_000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("devuelve null sin cabecera o con valor inválido", () => {

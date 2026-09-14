@@ -13,7 +13,9 @@ import type {
   Coordenadas,
   Credenciales,
   DatosAlumno,
+  ReticulaMap,
   ReticulaMateria,
+  SemestresReticula,
 } from "sith-api-client";
 
 export { ESTADO_MATERIA_RETICULA };
@@ -26,7 +28,9 @@ export type {
   Coordenadas,
   Credenciales,
   DatosAlumno,
+  ReticulaMap,
   ReticulaMateria,
+  SemestresReticula,
 };
 
 export type ApiErrorKind = "invalid-credentials" | "connection" | "unknown";

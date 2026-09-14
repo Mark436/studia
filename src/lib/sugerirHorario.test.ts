@@ -21,8 +21,8 @@ function reticula(clave: string, nombre = clave): ReticulaMateria {
     coordenadas: { x: 1, y: 1 },
     codigoEstado: 0,
     estado: "Falta cursar" as ReticulaMateria["estado"],
-    c: 0,
-    g: 0,
+    anteriores: [],
+    siguientes: [],
     seriacion: [],
   };
 }
