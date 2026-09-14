@@ -78,15 +78,39 @@ const ZONAS = {
 
 type ZonaTabla = keyof typeof ZONAS;
 
-function zonaDe(x: number): ZonaTabla | null {
-  for (const [zona, { min, max }] of Object.entries(ZONAS)) {
+type RangoZona = { readonly min: number; readonly max: number };
+type MapaZonas = { readonly [K in ZonaTabla]: RangoZona };
+
+const ORDEN_ZONAS: readonly ZonaTabla[] = [
+  "clave",
+  "gpo",
+  "materia",
+  "teoricas",
+  "practicas",
+  "creditos",
+  "semanales",
+  "maestro",
+  "aula",
+  "lunes",
+  "martes",
+  "miercoles",
+  "jueves",
+  "viernes",
+];
+
+function zonaDe(x: number, zonas: MapaZonas): ZonaTabla | null {
+  for (const [zona, { min, max }] of Object.entries(zonas)) {
     if (x >= min && x < max) return zona as ZonaTabla;
   }
   return null;
 }
 
 const CLAVE_RE = /^[A-Z]{1,4}[A-Za-z0-9]*\d{3,4}$/;
-const GPO_RE = /^S\d+[A-Z]+$/i;
+// El prefijo de los grupos varía por carrera (ISC usa S, Mecatrónica T,
+// Eléctrica L, Semiconductores O/E, IGE G, …); solo importa el dígito del
+// semestre y la letra final del grupo. El matcheo está acotado a la columna
+// Gpo, así que los salones («A5-7», «L8-3») con guiones no se cuelan.
+const GPO_RE = /^[A-Z](\d{1,2})[A-Z]{1,2}$/i;
 const NUMERO_RE = /^\d{1,3}$/;
 const PAQUETE_RE = /PAQUETE\s+(\d+)\/(\d+)/i;
 const TURNO_RE = /TURNO\s+([A-ZÁÉÍÓÚÑ]+)/i;
@@ -183,7 +207,7 @@ function acumularCelda(fila: FilaEnCurso, texto: string, zona: ZonaTabla): void 
     case "practicas":
     case "creditos":
     case "semanales":
-      fila.num[zona] += texto;
+      if (NUMERO_RE.test(texto)) fila.num[zona] += texto;
       break;
     case "maestro":
       fila.maestro.push(texto);
@@ -235,8 +259,9 @@ class PrehorarioBuilder {
   private readonly materias = new Map<string, Map<string, PrehorarioMateria>>();
 
   agregar(fila: FilaPrehorario, seccion: SeccionPrehorario | null): void {
-    const semestre = `S${fila.gpo.match(/^S(\d+)/)?.[1] ?? ""}`;
-    if (!/^S\d+$/.test(semestre)) return;
+    const coincidencia = GPO_RE.exec(fila.gpo);
+    const semestre = `S${coincidencia?.[1] ?? ""}`;
+    if (!/^S\d{1,2}$/.test(semestre)) return;
 
     let materias = this.materias.get(semestre);
     if (!materias) {
@@ -285,6 +310,7 @@ class PrehorarioBuilder {
  * las convierte en el JSON de semestres/materias/grupos.
  */
 export function procesarPrehorarioTexto(paginas: PaginaRenglones[]): PrehorarioJson {
+  const zonas = detectarMapaZonas(paginas) ?? ZONAS;
   const builder = new PrehorarioBuilder();
   const pendiente = { seccion: null as SeccionPrehorario | null, fila: null as FilaEnCurso | null };
 
@@ -325,16 +351,16 @@ export function procesarPrehorarioTexto(paginas: PaginaRenglones[]): PrehorarioJ
         continue;
       }
 
-      const fila = leerFila(cluster);
+      const fila = leerFila(cluster, zonas);
       if (fila.clave) {
         cerrarFila();
         pendiente.fila = fila;
         continue;
       }
 
-      if (pendiente.fila && esContinuacionValida(cluster)) {
+      if (pendiente.fila && esContinuacionValida(cluster, zonas.teoricas.min)) {
         for (const celda of cluster) {
-          const zona = zonaDe(celda.x);
+          const zona = zonaDe(celda.x, zonas);
           if (zona) acumularCelda(pendiente.fila, limpiarTexto(celda.texto), zona);
         }
       }
@@ -369,6 +395,86 @@ function agruparRenglones(renglones: RenglonPDF[]): CeldaAgrupada[][] {
   return grupos;
 }
 
+/** Rótulos fijos del encabezado de la tabla → columna. */
+const ANCLAS_ROTULO: Record<string, ZonaTabla> = {
+  Clave: "clave",
+  Gpo: "gpo",
+  Materia: "materia",
+  T: "teoricas",
+  P: "practicas",
+  C: "creditos",
+  MAESTRO: "maestro",
+  AULA: "aula",
+  Lun: "lunes",
+  Mar: "martes",
+  Mie: "miercoles",
+  Jue: "jueves",
+  Vie: "viernes",
+};
+
+/**
+ * Etiqueta de la columna de horas semanales. Se imprime «HRS SEM» en línea,
+ * «HRS»+«SEM» en renglones apilados, o fragmentada «HR»+«S» (IGE): conviven
+ * todas las variantes entre carreras.
+ */
+const ANCLA_SEMANALES_RE = /^(HRS? SEM?|SEM?|HRS?)$/i;
+
+/**
+ * Deriva los límites de columna del encabezado de la tabla en vez de usar las
+ * fijas de ISC (cada carrera firma su PDF con diferente geometría). El
+ * encabezado aparece una vez por sección; se unen las anclas de todos los
+ * encabezados encontrados y se recorta contra un encabezado mínimo. Devuelve
+ * `null` si no se dio un encabezado completo (los PDFs de ISC no cambian su
+ * geometría, así que el fallback a `ZONAS` solo aplica a documentos atípicos).
+ */
+function detectarMapaZonas(paginas: PaginaRenglones[]): MapaZonas | null {
+  const anclas: Partial<Record<ZonaTabla, number>> = {};
+  const xsSemanales: number[] = [];
+
+  for (const pagina of paginas) {
+    for (const cluster of agruparRenglones(pagina.renglones)) {
+      if (
+        !cluster.some(celda => limpiarTexto(celda.texto) === "Clave") ||
+        !cluster.some(celda => limpiarTexto(celda.texto) === "Gpo")
+      ) {
+        continue;
+      }
+
+      for (const celda of cluster) {
+        const texto = limpiarTexto(celda.texto);
+        const zona = ANCLAS_ROTULO[texto];
+        if (zona && anclas[zona] === undefined) anclas[zona] = celda.x;
+        if (ANCLA_SEMANALES_RE.test(texto)) xsSemanales.push(celda.x);
+      }
+    }
+  }
+
+  if (xsSemanales.length > 0) anclas.semanales = Math.max(...xsSemanales);
+  if (ORDEN_ZONAS.some(zona => anclas[zona] === undefined)) return null;
+
+  const completas = anclas as Required<Record<ZonaTabla, number>>;
+  const mitades = ORDEN_ZONAS.slice(0, -1).map((zona, i) =>
+    Math.round(((completas[zona] + completas[ORDEN_ZONAS[i + 1]]) / 2) * 10) / 10,
+  );
+
+  const zonas: Record<ZonaTabla, RangoZona> = {} as Record<ZonaTabla, RangoZona>;
+  const primera = ORDEN_ZONAS[0];
+  const ultima = ORDEN_ZONAS[ORDEN_ZONAS.length - 1];
+  zonas[primera] = {
+    min: completas[primera] - (mitades[0] - completas[primera]),
+    max: mitades[0],
+  };
+  for (let i = 1; i < ORDEN_ZONAS.length - 1; i++) {
+    zonas[ORDEN_ZONAS[i]] = { min: mitades[i - 1], max: mitades[i] };
+  }
+  zonas[ultima] = {
+    min: mitades[mitades.length - 1],
+    max: completas[ultima] + (completas[ultima] - mitades[mitades.length - 1]),
+  };
+
+  return zonas;
+}
+
 interface CeldaAgrupada {
   x: number;
   texto: string;
@@ -379,12 +485,12 @@ function esCabeceraTabla(texto: string): boolean {
 }
 
 /** Clasifica las celdas de una fila de datos y devuelve la fila en curso. */
-function leerFila(cluster: CeldaAgrupada[]): FilaEnCurso {
+function leerFila(cluster: CeldaAgrupada[], zonas: MapaZonas): FilaEnCurso {
   const fila = filaNueva();
   for (const celda of cluster) {
     const texto = limpiarTexto(celda.texto);
     if (!texto) continue;
-    const zona = zonaDe(celda.x);
+    const zona = zonaDe(celda.x, zonas);
     if (zona) acumularCelda(fila, texto, zona);
   }
   return fila;
@@ -393,14 +499,16 @@ function leerFila(cluster: CeldaAgrupada[]): FilaEnCurso {
 /**
  * Un continuo solo se agrega a la fila en curso si trae contenido de las
  * columnas numéricas/maestro/aula/días; los pies de página quedan fuera.
+ * El inicio de las columnas numéricas se obtiene de las zonas detectadas
+ * (no es fijo: cada carrera firma su PDF con diferente geometría).
  */
-function esContinuacionValida(cluster: CeldaAgrupada[]): boolean {
+function esContinuacionValida(cluster: CeldaAgrupada[], inicioNumeros: number): boolean {
   if (/\bNOTAS IMPORTANTES\b|\bCONSIDERACI\b|\bDISPOSICIONES\b|https?:|www\./i.test(
     cluster.map(celda => celda.texto).join(" "),
   )) {
     return false;
   }
-  return cluster.some(celda => celda.x >= 306);
+  return cluster.some(celda => celda.x >= inicioNumeros);
 }
 
 function extraerTurno(
