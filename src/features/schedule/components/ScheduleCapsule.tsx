@@ -165,7 +165,7 @@ export function ScheduleCapsule({
         }
         minimizedExpanded={
           <span className="flex min-w-0 flex-col gap-capsule-gap leading-tight">
-            <span className={SUBJECT_PRIORITY_CLASS}>
+            <span className="font-display text-capsule-headline font-bold text-on-surface">
               {notification.title}
             </span>
             {notification.conclusion ? (
@@ -178,21 +178,11 @@ export function ScheduleCapsule({
           </span>
         }
         expanded={
-          <>
-            <span className="text-capsule-caption font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
-              {notification.title}
+          notification.detail ? (
+            <span className="truncate font-display text-capsule-display font-bold leading-tight text-on-surface">
+              {notification.detail}
             </span>
-            {notification.detail ? (
-              <span className="font-display text-capsule-display font-bold leading-tight text-on-surface">
-                {notification.detail}
-              </span>
-            ) : null}
-            {notification.conclusion ? (
-              <span className="truncate text-capsule-body font-medium tabular-nums text-primary-strong">
-                {notification.conclusion}
-              </span>
-            ) : null}
-          </>
+          ) : null
         }
       />
     );

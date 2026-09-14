@@ -127,6 +127,7 @@ interface AttendTarget {
 // focus leaving the island, or on a pointer press outside of it.
 export function Capsule({
   minimized,
+  minimizedExpanded,
   expanded,
   pulseKey,
   popKey,
@@ -607,7 +608,7 @@ export function Capsule({
       >
         {isExpanded ? (
           <div className="flex min-w-0 flex-col gap-capsule-gap">
-            <div className="min-w-0">{minimized}</div>
+            <div className="min-w-0">{minimizedExpanded ?? minimized}</div>
             {expanded ? (
               <div className="min-w-0 motion-safe:animate-[studia-capsule-in_0.35s_var(--ease-out-soft)]">
                 {expanded}

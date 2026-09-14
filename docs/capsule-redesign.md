@@ -244,14 +244,15 @@ limpia. El detalle solo aparece si el usuario abre la cápsula.
   "Promedio · 8.75").
   
 
-**Desplegado (`stacked`)** — ancla con el título (`text-capsule-headline`) y
-la conclusión; bloque de énfasis bajo la materia con el detalle:
-- Eyebrow `notification.title` + `notification.detail` `font-display
-  text-capsule-display font-bold leading-tight` + `notification.conclusion`
-  (`text-capsule-body tabular-nums text-primary-strong`).
+**Desplegado (`stacked`)** — ancla con el título (`text-capsule-headline`) y la
+conclusión (misma lógica que el resto de los estados: el contenido del plegado
+se reescala en `minimizedExpanded` y se mantiene arriba); bloque bajo el ancla
+con **solo el dato nuevo**: el `detail` (`font-display text-capsule-display
+font-bold`). No se repiten abajo el título ni la conclusión.
 - CAMBIOS HECHOS (ajustable): migrado a `stacked`; título + conclusión
   plegados, detalle al expandir; se eliminó la secuencia en dos fases
-  (detalle → seguimiento).
+  (detalle → seguimiento). Ajuste posterior: el desplegado ya no repite el
+  eyebrow (título) ni la conclusión debajo del ancla — solo el `detail`.
 
 ## Pendientes (para seguir dictando) + calibración abierta
 
