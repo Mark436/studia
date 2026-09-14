@@ -193,7 +193,7 @@ export function SchedulePage({
                 }
                 aria-label={isToday ? "Agregar materia" : "Volver a hoy"}
                 title={isToday ? "Agregar materia" : "Volver a hoy"}
-                className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
                   isToday
                     ? "bg-primary-container text-on-primary-container hover:bg-primary-container/70"
                     : "bg-transparent font-semibold text-primary hover:bg-primary-container/50"

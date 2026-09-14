@@ -22,7 +22,7 @@ interface ScheduleCapsuleProps {
   meetings: readonly ResolvedMeeting[];
   /** Real clock instant driving every state (dev simulation included). */
   now: Date;
-  /** Next class of a future weekday, shown once today has no class ahead. */
+  /** The next class of a future weekday, shown once today, has no class ahead. */
   nextClassInfo?: NextClassInfo | null;
   /** Transient event (new grade, debt…) flashed before returning to classes. */
   notification?: CapsuleNotification | null;
@@ -137,7 +137,7 @@ export function ScheduleCapsule({
   }, [currentTick, clock]);
 
   // Notification flash: one coherent alert (title + conclusion visible while
-  // collapsed; detail appears on expand). The pop announces the arrival while
+  // collapsed; detail appears on expanded). The pop announces the arrival while
   // the capsule stays collapsed (no auto-open); the notification clears itself
   // after CAPSULE_FLASH_LIFETIME_MS (see app/App.tsx).
   const flashing = notification !== null;
@@ -255,14 +255,14 @@ export function ScheduleCapsule({
     );
   }
 
-if (state.kind === "in-class") {
+  if (state.kind === "in-class") {
     const classroomLabel = formatClassroomLabel(state.classroom);
     const professorLabel = formatProfessorLabel(state.professor);
     return (
-<Capsule
-          tone="accent"
-          autoCollapseMs={autoCollapseMs}
-          pulseKey={effectivePulse}
+      <Capsule
+        tone="accent"
+        autoCollapseMs={autoCollapseMs}
+        pulseKey={effectivePulse}
         progressPercent={state.progressPercent}
         ariaLabel={`En clase: ${state.subjectName}, termina a las ${state.endsLabel}`}
         minimized={
@@ -275,7 +275,7 @@ if (state.kind === "in-class") {
                 </span>
               ) : null}
             </span>
-            <span className={`${SUBJECT_PRIORITY_CLASS} truncate`}>
+            <span className="max-w-capsule-line-sm truncate text-capsule-caption font-medium text-on-surface-variant">
               {shortenSubjectName(state.subjectName)}
             </span>
           </span>
@@ -290,7 +290,7 @@ if (state.kind === "in-class") {
                 </span>
               ) : null}
             </span>
-            <span className="motion-safe:animate-[studia-capsule-in_0.35s_var(--ease-out-soft)] overflow-hidden text-capsule-body font-medium text-on-surface">
+            <span className="truncate text-capsule-body font-medium text-on-surface">
               {state.subjectName}
             </span>
           </span>
@@ -306,12 +306,12 @@ if (state.kind === "in-class") {
     );
   }
 
-const classroomLabel = formatClassroomLabel(state.classroom);
+  const classroomLabel = formatClassroomLabel(state.classroom);
   const professorLabel = formatProfessorLabel(state.professor);
   return (
-<Capsule
-          autoCollapseMs={autoCollapseMs}
-          pulseKey={effectivePulse}
+    <Capsule
+      autoCollapseMs={autoCollapseMs}
+      pulseKey={effectivePulse}
       ariaLabel={`Siguiente clase: ${state.subjectName} a las ${state.startsLabel}`}
       minimized={
         <span className="flex min-w-0 flex-col leading-tight">
@@ -323,12 +323,12 @@ const classroomLabel = formatClassroomLabel(state.classroom);
               </span>
             ) : null}
           </span>
-          <span className={`${SUBJECT_PRIORITY_CLASS} truncate`}>
+          <span className="max-w-capsule-line-sm truncate text-capsule-caption font-medium text-on-surface-variant">
             {shortenSubjectName(state.subjectName)}
           </span>
         </span>
       }
-minimizedExpanded={
+      minimizedExpanded={
         <span className="flex min-w-0 flex-col gap-capsule-gap leading-tight">
           <span className="flex items-baseline gap-capsule-gap-lg">
             <DurationCounter minutes={state.minutesUntil} size="lg" />
@@ -338,7 +338,7 @@ minimizedExpanded={
               </span>
             ) : null}
           </span>
-          <span className="motion-safe:animate-[studia-capsule-in_0.35s_var(--ease-out-soft)] truncate text-capsule-body font-medium text-on-surface">
+          <span className="truncate text-capsule-body font-medium text-on-surface">
             {state.subjectName}
           </span>
         </span>

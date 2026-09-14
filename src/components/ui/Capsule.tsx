@@ -61,13 +61,15 @@ const EXPANDED_RADIUS_PX = 20;
 function collapsedRadiusPx({
   element,
   isExpanded,
+  height,
 }: {
-  element: HTMLElement;
+  element?: HTMLElement | null;
   isExpanded: boolean;
+  height?: number;
 }): number {
   if (isExpanded) return EXPANDED_RADIUS_PX;
-  const height = element.offsetHeight || 0;
-  return height / 2;
+  const h = height ?? element?.offsetHeight ?? 48;
+  return h / 2;
 }
 
 interface CapsulePadding {
@@ -311,7 +313,21 @@ export function Capsule({
     const targetX = isExpanded
       ? Math.max(0, (parent.clientWidth - targetWidth) / 2)
       : 0;
-    const targetRadius = collapsedRadiusPx({ element, isExpanded });
+    const targetRadius = collapsedRadiusPx({
+      element,
+      isExpanded,
+      height: targetHeight,
+    });
+    const fromRadius = inFlight
+      ? parseFloat(String(gsap.getProperty(element, "borderRadius"))) ||
+        collapsedRadiusPx({
+          isExpanded: !isExpanded,
+          height: fromHeight,
+        })
+      : collapsedRadiusPx({
+          isExpanded: !isExpanded,
+          height: fromHeight,
+        });
 
     morphingRef.current = true;
     if (fromWidth !== undefined) {
@@ -320,9 +336,9 @@ export function Capsule({
         height: fromHeight ?? fromWidth,
         minWidth: 0,
         x: Number(fromX),
-        borderRadius: collapsedRadiusPx({ element, isExpanded }),
+        borderRadius: fromRadius,
       });
-      if (fromPadding !== null) applyPadding(element, fromPadding);
+      if (fromPadding !== null && fromPadding !== undefined) applyPadding(element, fromPadding);
     }
     gsap.to(element, {
       width: targetWidth,
@@ -566,7 +582,7 @@ export function Capsule({
         isExpanded
           ? "max-w-[calc(100vw-1rem)] min-w-64 rounded-[20px] p-capsule-pad"
           : "min-h-12 rounded-full px-capsule-pad-sm"
-      } transition-[padding,opacity] duration-300 ease-out active:opacity-80 ${glassClass} ${className ?? ""}`}
+      } transition-opacity duration-150 ease-out active:opacity-80 ${glassClass} ${className ?? ""}`}
       style={
         isExpanded
           ? {

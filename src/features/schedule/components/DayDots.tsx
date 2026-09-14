@@ -66,7 +66,7 @@ export function DayDots({
       ref={stripRef}
       role="group"
       aria-label="Cambiar día del horario"
-      className="relative flex max-w-dropdown-sm snap-x snap-proximity items-center gap-3 overflow-x-auto rounded-full bg-surface/70 px-2 py-1 shadow-sm ring-1 ring-outline-variant/70 scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      className="relative flex w-40 shrink-0 snap-x snap-proximity items-center gap-3 overflow-x-auto rounded-full bg-surface/70 px-2 py-1 shadow-sm ring-1 ring-outline-variant/70 scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       {days.map((date, index) => {
         const isSelected = index === SIDE_DAYS;
