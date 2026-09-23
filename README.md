@@ -2,8 +2,7 @@
 
 Studia es una PWA móvil para que estudiantes consulten rápidamente su información
 académica. Reúne el horario, las calificaciones y los datos del alumno en una
-experiencia enfocada en las tareas cotidianas, en lugar de reproducir un portal
-administrativo institucional.
+experiencia enfocada en las tareas cotidianas
 
 ## Funcionalidades
 
