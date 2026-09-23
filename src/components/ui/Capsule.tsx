@@ -338,7 +338,8 @@ export function Capsule({
         x: Number(fromX),
         borderRadius: fromRadius,
       });
-      if (fromPadding !== null && fromPadding !== undefined) applyPadding(element, fromPadding);
+      if (fromPadding !== null && fromPadding !== undefined)
+        applyPadding(element, fromPadding);
     }
     gsap.to(element, {
       width: targetWidth,
@@ -530,14 +531,9 @@ export function Capsule({
         timeline
           .fromTo(
             flashOverlay,
-            { opacity: 0 },
+            { opacity: 1 },
             { opacity: 0.4, duration: 0.08, ease: "power1.out" },
             0,
-          )
-          .to(
-            flashOverlay,
-            { opacity: 0.15, duration: 0.06, ease: "power1.in" },
-            0.1,
           )
           .to(
             flashOverlay,
@@ -546,7 +542,7 @@ export function Capsule({
           )
           .to(
             flashOverlay,
-            { opacity: 0, duration: 0.08, ease: "power1.in" },
+            { opacity: 0.6, duration: 0.08, ease: "power1.in" },
             0.23,
           );
       }
