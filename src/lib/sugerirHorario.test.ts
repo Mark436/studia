@@ -8,9 +8,17 @@ import type {
 } from "@/lib/prehorarioTablas";
 import {
   calcularSugerenciaHorario,
+  coincideAproximadoClave,
+  coincideAproximadoNombre,
+  distanciaLevenshtein,
+  gruposDeMateria,
   huecosMinutos,
+  normalizarClave,
+  normalizarNombreMateria,
   parseBloque,
   seChochan,
+  similitudClave,
+  similitudNombre,
   type HorarioSemanal,
 } from "@/lib/sugerirHorario";
 
@@ -49,10 +57,11 @@ function grupo(gpo: string, horario: Partial<Record<DiaHorario, string[]>>): Pre
 function materiaPrehorario(
   clave: string,
   grupos: PrehorarioGrupo[],
+  nombre = clave,
 ): PrehorarioMateria {
   return {
     clave,
-    nombre: clave,
+    nombre,
     horas: { teoricas: null, practicas: null, semanales: null },
     creditos: null,
     grupos,
@@ -226,5 +235,125 @@ describe("calcularSugerenciaHorario", () => {
     expect(result.materias).toEqual([]);
     expect(result.excluidas).toEqual([]);
     expect(result.huecosMinutos).toBe(0);
+  });
+});
+
+describe("coincidencia aproximada de claves y nombres", () => {
+  it("normaliza y calcula distancia y similitud de claves", () => {
+    expect(normalizarClave("SCD-1016")).toBe("SCD1016");
+    expect(normalizarClave("acf 0901")).toBe("ACF0901");
+    expect(distanciaLevenshtein("ACF0901", "ACF0901")).toBe(0);
+    expect(distanciaLevenshtein("ACF0901", "ACF0905")).toBe(1);
+
+    expect(similitudClave("SCD-1016", "SCD1016")).toBe(1.0);
+    expect(coincideAproximadoClave("SCD-1016", "SCD1016")).toBe(true);
+    expect(coincideAproximadoClave("SCD1016", "SC1016")).toBe(true);
+    expect(coincideAproximadoClave("ACF0901", "AED1285")).toBe(false);
+  });
+
+  it("normaliza nombres removiendo acentos, stopwords, anotaciones y abreviaturas", () => {
+    expect(normalizarNombreMateria("CÁLCULO DIFERENCIAL ( R )")).toBe("CALCULO DIFERENCIAL");
+    expect(normalizarNombreMateria("Estructuras de Datos")).toBe("ESTRUCTURA DATO");
+    expect(normalizarNombreMateria("Lenguajes y Autómatas I")).toBe("LENGUAJE AUTOMATA 1");
+    expect(normalizarNombreMateria("DESARROLLO DE SW DISTRIBUIDO II")).toBe("DESARROLLO SOFTWARE DISTRIBUIDO 2");
+  });
+
+  it("calcula similitud de nombres y detecta matches aproximados válidos", () => {
+    expect(similitudNombre("Cálculo Diferencial", "CALCULO DIFERENCIAL ( R )")).toBe(1.0);
+    expect(coincideAproximadoNombre("Cálculo Diferencial", "CALCULO DIFERENCIAL ( R )")).toBe(true);
+    expect(coincideAproximadoNombre("Estructura de Datos", "ESTRUCTURAS DE DATOS")).toBe(true);
+    expect(coincideAproximadoNombre("Lenguajes y Autómatas I", "LENGUAJES Y AUTOMATAS 1")).toBe(true);
+    expect(coincideAproximadoNombre("Desarrollo de Software Distribuido II", "DESARROLLO DE SW DISTRIBUIDO II")).toBe(true);
+    expect(coincideAproximadoNombre("Taller de Base de Datos", "TALLER DE BASES DE DATOS")).toBe(true);
+
+    // Nombres distintos no deben coincidir
+    expect(coincideAproximadoNombre("Cálculo Diferencial", "CALCULO INTEGRAL")).toBe(false);
+    expect(coincideAproximadoNombre("Física General", "QUIMICA GENERAL")).toBe(false);
+  });
+});
+
+describe("gruposDeMateria - búsqueda exacta y aproximada", () => {
+  it("encuentra grupos por coincidencia exacta de clave primero", () => {
+    const json = prehorario([
+      materiaPrehorario("ACF0901", [grupo("S2A", { lunes: ["07:00-08:00"] })], "CALCULO DIFERENCIAL"),
+    ]);
+
+    const grupos = gruposDeMateria(
+      { clave: "ACF0901", nombre: "Cálculo Diferencial" },
+      json,
+    );
+    expect(grupos.map(g => g.grupo)).toEqual(["S2A"]);
+  });
+
+  it("si no encuentra por clave exacta, busca por match aproximado de nombre Y clave (ambos)", () => {
+    const json = prehorario([
+      materiaPrehorario("SCD1016", [grupo("S7B", { lunes: ["07:00-08:00"] })], "LENGUAJES Y AUTOMATAS I"),
+      materiaPrehorario("DSF2405", [grupo("S9B", { lunes: ["16:00-17:00"] })], "DESARROLLO DE SW DISTRIBUIDO II"),
+      materiaPrehorario("ACF0905", [grupo("E3A", { lunes: ["13:00-14:00"] })], "ECUACIONES DIFERENCIALES ( R )"),
+    ]);
+
+    // Caso 1: Clave con guión "SCD-1016" vs "SCD1016" y nombre "Lenguajes y Autómatas 1" vs "LENGUAJES Y AUTOMATAS I"
+    const gruposLenguajes = gruposDeMateria(
+      { clave: "SCD-1016", nombre: "Lenguajes y Autómatas 1" },
+      json,
+    );
+    expect(gruposLenguajes.map(g => g.grupo)).toEqual(["S7B"]);
+
+    // Caso 2: Nombre con SW vs SOFTWARE y clave con guión
+    const gruposSW = gruposDeMateria(
+      { clave: "DSF-2405", nombre: "Desarrollo de Software Distribuido II" },
+      json,
+    );
+    expect(gruposSW.map(g => g.grupo)).toEqual(["S9B"]);
+
+    // Caso 3: Nombre con anotación ( R ) y clave con guión
+    const gruposEcuaciones = gruposDeMateria(
+      { clave: "ACF-0905", nombre: "Ecuaciones Diferenciales" },
+      json,
+    );
+    expect(gruposEcuaciones.map(g => g.grupo)).toEqual(["E3A"]);
+  });
+
+  it("NO encuentra si coincide aproximadamente la clave pero NO el nombre", () => {
+    const json = prehorario([
+      materiaPrehorario("ACF0903", [grupo("O3A", { lunes: ["13:00-14:00"] })], "CALCULO VECTORIAL"),
+    ]);
+
+    // "ACF-0905" vs "ACF0903" tiene clave cercana (distancia 1), pero el nombre es Ecuaciones Diferenciales vs Cálculo Vectorial
+    const grupos = gruposDeMateria(
+      { clave: "ACF-0905", nombre: "Ecuaciones Diferenciales" },
+      json,
+    );
+    expect(grupos).toEqual([]);
+  });
+
+  it("NO encuentra si coincide aproximadamente el nombre pero NO la clave", () => {
+    const json = prehorario([
+      materiaPrehorario("ACF0901", [grupo("S1A", { lunes: ["07:00-08:00"] })], "CALCULO DIFERENCIAL"),
+    ]);
+
+    // Nombre coincide, pero clave es completamente distinta (ej. de otro plan o universidad)
+    const grupos = gruposDeMateria(
+      { clave: "MAT101", nombre: "Cálculo Diferencial" },
+      json,
+    );
+    expect(grupos).toEqual([]);
+  });
+
+  it("calcularSugerenciaHorario resuelve horarios con materias emparejadas por búsqueda aproximada", () => {
+    const reticulaMaterias = [
+      reticula("SCD-1016", "Lenguajes y Autómatas 1"),
+      reticula("DSF-2405", "Desarrollo de Software Distribuido II"),
+    ];
+
+    const json = prehorario([
+      materiaPrehorario("SCD1016", [grupo("S7B", { lunes: ["07:00-08:00"] })], "LENGUAJES Y AUTOMATAS I"),
+      materiaPrehorario("DSF2405", [grupo("S9B", { lunes: ["08:00-09:00"] })], "DESARROLLO DE SW DISTRIBUIDO II"),
+    ]);
+
+    const result = calcularSugerenciaHorario(reticulaMaterias, json);
+    expect(result.materias.map(m => m.clave)).toEqual(["SCD-1016", "DSF-2405"]);
+    expect(result.materias.map(m => m.grupo.grupo)).toEqual(["S7B", "S9B"]);
+    expect(result.excluidas).toEqual([]);
   });
 });

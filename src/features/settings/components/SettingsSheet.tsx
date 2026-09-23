@@ -37,13 +37,13 @@ export function SettingsSheet({
         type="button"
         aria-label="Cerrar"
         onClick={onClose}
-        className="absolute inset-0 cursor-default bg-on-background/40 backdrop-blur-[2px]"
+        className="absolute inset-0 cursor-default bg-on-background/40 backdrop-blur-[2px] motion-safe:animate-[studia-fade-in_0.25s_ease-out]"
       />
       <section
         role="dialog"
         aria-modal="true"
         aria-label="Ajustes"
-        className="relative flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-surface pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-lg ring-1 ring-outline-variant"
+        className="relative flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-surface pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-lg ring-1 ring-outline-variant motion-safe:animate-[studia-sheet-in_0.35s_var(--ease-glide)]"
       >
         <div className="mx-auto mb-4 mt-3 h-1 w-10 shrink-0 rounded-full bg-outline-variant" />
         <div className="flex items-center justify-between px-5">

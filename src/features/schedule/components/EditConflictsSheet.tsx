@@ -36,13 +36,13 @@ export function EditConflictsSheet({
         type="button"
         aria-label="Cerrar"
         onClick={onClose}
-        className="absolute inset-0 cursor-default bg-on-background/40 backdrop-blur-[2px]"
+        className="absolute inset-0 cursor-default bg-on-background/40 backdrop-blur-[2px] motion-safe:animate-[studia-fade-in_0.25s_ease-out]"
       />
       <section
         role="dialog"
         aria-modal="true"
         aria-label="Cambios en tus materias"
-        className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-lg ring-1 ring-outline-variant"
+        className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-lg ring-1 ring-outline-variant motion-safe:animate-[studia-sheet-in_0.35s_var(--ease-glide)]"
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-outline-variant" />
         <h2 className="text-lg font-semibold text-on-surface">
