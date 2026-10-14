@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { FocusEvent, KeyboardEvent } from "react";
 import type { ReactNode } from "react";
 import gsap from "gsap";
@@ -119,14 +120,13 @@ interface AttendTarget {
 // The context capsule: a floating island sitting at the top-left that morphs
 // to a centered expanded card. Position travels through a composited `x`
 // transform (never `left`), so the backdrop blur behind the glass panel stays
-// rasterized and constant across the whole tween. The border-radius is NOT
-// animated (it snaps per state via classes): any radius tween forces the
-// browser to re-sample the backdrop-filter frame by frame, which reads as the
-// blur "animating". Padding IS animated (interpolable), so the box grows
-// smoothly even though width/height are content-fit. The anchor's position is
-// owned by GSAP, so every collapse plays its full (slightly slower) duration
-// regardless of what triggered it (tap, pulse, timer, Escape, blur or outside
-// press).
+// rasterized and constant across the whole tween. Border-radius, padding, width
+// and height are all tweened together so the pill morphs into the card and back
+// symmetrically. Collapsing keeps the expanded layout mounted until the tween
+// ends (clipped by overflow-hidden), so the data never reflows mid-animation.
+// The anchor's position is owned by GSAP, so every collapse plays its full
+// (slightly slower) duration regardless of what triggered it (tap, pulse,
+// timer, Escape, blur or outside press).
 //
 // Expansion is always transient: it ends after autoCollapseMs, on Escape, on
 // focus leaving the island, or on a pointer press outside of it.
@@ -144,6 +144,13 @@ export function Capsule({
   className,
 }: CapsuleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  // While a collapse tween runs we keep rendering the expanded layout so the
+  // data doesn't reflow on the first frame; the swap happens on completion.
+  const [collapsing, setCollapsing] = useState(false);
+  // Inner width to freeze during a collapse so the expanded text keeps its
+  // line breaks while the box narrows (overflow-hidden clips the trailing edge).
+  const [frozenWidth, setFrozenWidth] = useState<number | null>(null);
+  const showExpanded = isExpanded || collapsing;
   const elementRef = useRef<HTMLButtonElement>(null);
   const flashOverlayRef = useRef<HTMLDivElement>(null);
   const collapseTimerRef = useRef<number | undefined>(undefined);
@@ -354,6 +361,19 @@ export function Capsule({
       if (fromPadding !== null && fromPadding !== undefined)
         applyPadding(element, fromPadding);
     }
+    // Collapsing: the mounted content is the collapsed layout only for this
+    // first frame (so we could measure the destination above). Freeze the
+    // expanded layout back in place — including its inner width, so the text
+    // keeps its line breaks — and let overflow-hidden clip it while the box
+    // shrinks; the collapsed content lands exactly when the tween ends.
+    if (!isExpanded) {
+      const innerWidth =
+        fromRef && fromPadRef
+          ? fromRef.width - fromPadRef.left - fromPadRef.right
+          : null;
+      setFrozenWidth(innerWidth !== null && innerWidth > 0 ? innerWidth : null);
+      setCollapsing(true);
+    }
     gsap.to(element, {
       width: targetWidth,
       height: targetHeight,
@@ -367,6 +387,18 @@ export function Capsule({
       ease: isExpanded ? CAPSULE_MORPH_EASE : CAPSULE_COLLAPSE_EASE,
       overwrite: "auto",
       onComplete() {
+        if (!isExpanded) {
+          // Swap to the collapsed content synchronously so the box is never
+          // left showing the expanded layout clipped to the collapsed size.
+          flushSync(() => {
+            setCollapsing(false);
+            setFrozenWidth(null);
+          });
+        } else {
+          // Clears a leftover flag if an expand interrupted a collapse.
+          setCollapsing(false);
+          setFrozenWidth(null);
+        }
         element.style.width = "";
         element.style.height = "";
         element.style.minWidth = "";
@@ -457,7 +489,7 @@ export function Capsule({
 
     const element = elementRef.current;
     const flashOverlay = flashOverlayRef.current;
-    if (element === null || reducedMotion || isExpanded) return;
+    if (element === null || reducedMotion || isExpanded || collapsing) return;
 
     const fromSize = collapsedSizeRef.current;
 
@@ -560,7 +592,7 @@ export function Capsule({
           );
       }
     }
-  }, [popKey, isExpanded, reducedMotion]);
+  }, [popKey, isExpanded, collapsing, reducedMotion]);
 
   useEffect(
     () => () => {
@@ -593,7 +625,7 @@ export function Capsule({
           : "min-h-12 rounded-full px-capsule-pad-sm"
       } transition-opacity duration-150 ease-out active:opacity-80 ${glassClass} ${className ?? ""}`}
       style={
-        isExpanded
+        showExpanded
           ? {
               // Resting radius before GSAP tween takes over. Collapsed lets the
               // `rounded-full` class rule (true pill at every height).
@@ -629,9 +661,14 @@ export function Capsule({
       {/* Content: single anchor (collapsed pill / expanded top block), with
           detail stacked below when expanded. */}
       <div
-        className={isExpanded ? "min-w-0" : "flex min-w-0 items-center gap-1.5"}
+        className={showExpanded ? "min-w-0" : "flex min-w-0 items-center gap-1.5"}
+        style={
+          !isExpanded && collapsing && frozenWidth !== null
+            ? { minWidth: `${frozenWidth}px` }
+            : undefined
+        }
       >
-        {isExpanded ? (
+        {showExpanded ? (
           <div className="flex min-w-0 flex-col gap-capsule-gap">
             <div className="min-w-0">{minimizedExpanded ?? minimized}</div>
             {expanded ? (
