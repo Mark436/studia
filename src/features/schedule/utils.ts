@@ -41,22 +41,64 @@ export function formatClassroomLabel(classroom: string): string | null {
 
 /**
  * Subject name sized for the collapsed capsule's short line. Names that fit
- * fully are kept as-is; longer multi-word names shrink to the leading words
- * until the cap holds (single lines never wrap, so the pill stays compact).
+ * fully are kept as-is. Longer names first drop connector words ("de", "la",
+ * "en", …) so the meaningful words survive, then keep the first word whole and
+ * shorten each following word to a few leading letters — "Taller de
+ * Investigación" becomes "Taller Inv" instead of the old "Taller de".
  * `text-xs` General Sans 500 runs roughly 6.5–7 px/char against the ~105 px
  * line's reserved width, which makes 12 chars the verified comfort zone.
  */
 export const CAPSULE_SUBJECT_FULL_CHARS = 12;
+
+/** Leading letters kept from each trailing word when abbreviating. */
+const SUBJECT_WORD_ABBREV_CHARS = 3;
+
+/** Connectors that add no distinguishing meaning to a subject name. */
+const SUBJECT_STOP_WORDS = new Set([
+  "a",
+  "al",
+  "con",
+  "de",
+  "del",
+  "e",
+  "el",
+  "en",
+  "la",
+  "las",
+  "los",
+  "o",
+  "para",
+  "por",
+  "u",
+  "un",
+  "una",
+  "unas",
+  "unos",
+  "y",
+]);
 
 export function shortenSubjectName(name: string): string {
   const cleaned = name.trim().replace(/\s+/g, " ");
   if (cleaned.length <= CAPSULE_SUBJECT_FULL_CHARS) return cleaned;
 
   const words = cleaned.split(" ");
-  let result = cleaned;
-  while (result.length > CAPSULE_SUBJECT_FULL_CHARS && words.length > 1) {
-    words.pop();
-    result = words.join(" ");
+  const meaningful = words.filter(
+    (word) => !SUBJECT_STOP_WORDS.has(word.toLowerCase()),
+  );
+  // All connectors (or none left): fall back to the raw words so we never
+  // return an empty anchor.
+  const kept = meaningful.length > 0 ? meaningful : words;
+
+  const full = kept.join(" ");
+  if (full.length <= CAPSULE_SUBJECT_FULL_CHARS) return full;
+
+  // Keep the first word whole; append abbreviated trailing words only while
+  // the cap still holds.
+  let result = kept[0];
+  for (let index = 1; index < kept.length; index += 1) {
+    const candidate = `${result} ${kept[index].slice(0, SUBJECT_WORD_ABBREV_CHARS)}`;
+    if (candidate.length > CAPSULE_SUBJECT_FULL_CHARS) break;
+    result = candidate;
   }
   return result;
 }

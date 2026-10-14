@@ -90,9 +90,11 @@ interface ActiveToast {
 function ContextCapsule({
   collapseMs,
   notification,
+  onExpandedChange,
 }: {
   collapseMs: number;
   notification: CapsuleNotification | null;
+  onExpandedChange?: (expanded: boolean) => void;
 }) {
   const { resolvedWeek } = useScheduleState();
   const now = useCurrentTime();
@@ -112,6 +114,7 @@ function ContextCapsule({
       now={now}
       nextClassInfo={nextClassInfo}
       notification={notification}
+      onExpandedChange={onExpandedChange}
       autoCollapseMs={collapseMs}
     />
   );
@@ -138,6 +141,9 @@ function AuthenticatedShell() {
   );
   const [reAuthOpen, setReAuthOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Tracks whether the persistent context capsule is open, so the schedule
+  // day nav can slide off the right edge while the island is expanded.
+  const [capsuleExpanded, setCapsuleExpanded] = useState(false);
   const [toast, setToast] = useState<ActiveToast | null>(null);
   const toastIdRef = useRef(0);
 
@@ -457,10 +463,14 @@ function AuthenticatedShell() {
           />
         }
         onPullToRefresh={handlePullToRefresh}
+        topSpace={
+          tab === "schedule" || tab === "reticula" ? "none" : "half"
+        }
         topSlot={
           <ContextCapsule
             collapseMs={capsuleCollapseMs}
             notification={capsuleNotification}
+            onExpandedChange={setCapsuleExpanded}
           />
         }
       >
@@ -473,12 +483,16 @@ function AuthenticatedShell() {
                 alumno={effectiveAlumno}
                 longPressDurationMs={longPressDurationMs}
                 simulated={devActive}
+                capsuleExpanded={capsuleExpanded}
                 onShowToast={showToast}
               />
             ) : activeKey === "grades" ? (
               <GradesPage alumno={effectiveAlumno} />
             ) : activeKey === "reticula" ? (
-              <ReticulaPage alumno={effectiveAlumno} />
+              <ReticulaPage
+                alumno={effectiveAlumno}
+                capsuleExpanded={capsuleExpanded}
+              />
             ) : (
               <StudentPage
                 alumno={effectiveAlumno}

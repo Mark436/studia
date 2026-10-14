@@ -8,8 +8,6 @@ import { CheckCircleIcon } from "@/components/ui/icons";
 
 interface ReticulaCardProps {
   semestre: SemestreReticula;
-  isActive: boolean;
-  onToggle: () => void;
   filtro: FiltroReticula;
   obtenerMateriasFiltradas: (semestre: number) => ReticulaMateria[];
   reticulaMap: ReticulaMap;
@@ -17,27 +15,25 @@ interface ReticulaCardProps {
 
 export function ReticulaCard({
   semestre,
-  isActive,
-  onToggle,
   filtro,
   obtenerMateriasFiltradas,
   reticulaMap,
 }: ReticulaCardProps) {
   const estaFiltrando = filtro !== "todas";
-  const [isOpen, setIsOpen] = useState(
-    !semestre.estaCompleto || isActive || estaFiltrando,
-  );
+  // Unfinished semesters start open, finished ones start collapsed; every
+  // section stays user-collapsible afterwards (toggling no longer forces the
+  // current semester back open).
+  const [isOpen, setIsOpen] = useState(!semestre.estaCompleto);
 
+  // Filtering hides non-matching subjects, so surface every match by opening
+  // all sections. Clearing the filter leaves them where the user left them.
   useEffect(() => {
-    setIsOpen(!semestre.estaCompleto || isActive || estaFiltrando);
-  }, [estaFiltrando, isActive, semestre.estaCompleto]);
+    if (estaFiltrando) setIsOpen(true);
+  }, [estaFiltrando]);
 
   const materiasFiltradas = obtenerMateriasFiltradas(semestre.numero);
 
-  const handleClick = () => {
-    setIsOpen((prev) => !prev);
-    onToggle();
-  };
+  const handleClick = () => setIsOpen((prev) => !prev);
 
   return (
     <Card className="flex flex-col gap-2 overflow-hidden">

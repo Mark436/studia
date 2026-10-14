@@ -26,6 +26,8 @@ interface ScheduleCapsuleProps {
   nextClassInfo?: NextClassInfo | null;
   /** Transient event (new grade, debt…) flashed before returning to classes. */
   notification?: CapsuleNotification | null;
+  /** Notifies the owner when the island opens/closes (see Capsule). */
+  onExpandedChange?: (expanded: boolean) => void;
   autoCollapseMs: number;
 }
 
@@ -111,6 +113,7 @@ export function ScheduleCapsule({
   now,
   nextClassInfo = null,
   notification = null,
+  onExpandedChange,
   autoCollapseMs,
 }: ScheduleCapsuleProps) {
   const clock = useClock();
@@ -147,11 +150,19 @@ export function ScheduleCapsule({
     return (
 <Capsule
           autoCollapseMs={autoCollapseMs}
+          onExpandedChange={onExpandedChange}
           popKey={notification.id}
           ariaLabel={`${notification.title}${notification.conclusion ? `: ${notification.conclusion}` : ""}`}
         minimized={
-          <span className="flex min-w-0 flex-col leading-tight">
-            <span className="text-capsule-body font-semibold text-on-surface">
+          // Collapsed flash must not reach the day/retícula selector parked at
+          // the right: cap its width to the room left of it and let the text
+          // wrap (the pill only grows taller, which is fine). `18rem` covers the
+          // selector row (~13.75rem) + both edge insets + a small gap.
+          <span
+            className="flex min-w-0 flex-col leading-tight"
+            style={{ maxWidth: "min(12rem, calc(100vw - 18rem))" }}
+          >
+            <span className="text-capsule-body font-semibold text-on-surface [overflow-wrap:anywhere]">
               {notification.title}
             </span>
             {notification.conclusion ? (
@@ -208,6 +219,7 @@ export function ScheduleCapsule({
     return (
 <Capsule
           autoCollapseMs={autoCollapseMs}
+          onExpandedChange={onExpandedChange}
           pulseKey={effectivePulse}
           ariaLabel={
             info === null
@@ -262,6 +274,7 @@ export function ScheduleCapsule({
       <Capsule
         tone="accent"
         autoCollapseMs={autoCollapseMs}
+        onExpandedChange={onExpandedChange}
         pulseKey={effectivePulse}
         progressPercent={state.progressPercent}
         ariaLabel={`En clase: ${state.subjectName}, termina a las ${state.endsLabel}`}
@@ -311,6 +324,7 @@ export function ScheduleCapsule({
   return (
     <Capsule
       autoCollapseMs={autoCollapseMs}
+      onExpandedChange={onExpandedChange}
       pulseKey={effectivePulse}
       ariaLabel={`Siguiente clase: ${state.subjectName} a las ${state.startsLabel}`}
       minimized={

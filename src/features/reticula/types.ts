@@ -29,31 +29,12 @@ export const ESTADO_MATERIA_LABELS: Record<number, string> = {
   13: "Inscrito en curso de especial",
 };
 
-export const ESTADO_MATERIA_VARIANT: Record<number, "success" | "warning" | "neutral" | "error"> = {
-  0: "neutral",
-  1: "neutral",
-  2: "success",
-  3: "success",
-  4: "success",
-  5: "warning",
-  6: "warning",
-  7: "neutral",
-  8: "neutral",
-  9: "neutral",
-  10: "error",
-  11: "neutral",
-  12: "warning",
-  13: "neutral",
-};
-
+export const ESTADOS_CURSANDO = new Set<number>([1,5,6,7,8,9,11,12,13]);
+export const ESTADOS_ACREDITADOS = new Set<number>([2,3,4]);
 export function calcularProgresoSemestre(materias: ReticulaMateria[]) {
   const total = materias.length;
-  const acreditadas = materias.filter(
-    (m) => m.codigoEstado === 2 || m.codigoEstado === 3 || m.codigoEstado === 4,
-  ).length;
-  const cursando = materias.filter((m) =>
-    [1, 5, 6, 7, 11, 12, 13].includes(m.codigoEstado),
-  ).length;
+  const acreditadas = materias.filter((m) => ESTADOS_ACREDITADOS.has(m.codigoEstado)).length;
+  const cursando = materias.filter((m) => ESTADOS_CURSANDO.has(m.codigoEstado)).length;
   const pendientes = total - acreditadas - cursando;
   return { total, acreditadas, cursando, pendientes, estaCompleto: acreditadas === total && total > 0 };
 }
@@ -81,13 +62,9 @@ export function filtrarMaterias(
     case "pendientes":
       return materias.filter((m) => m.codigoEstado === 0);
     case "acreditadas":
-      return materias.filter(
-        (m) => m.codigoEstado === 2 || m.codigoEstado === 3 || m.codigoEstado === 4,
-      );
+      return materias.filter((m) => ESTADOS_ACREDITADOS.has(m.codigoEstado));
     case "cursando":
-      return materias.filter((m) =>
-        [1, 5, 6, 7, 11, 12, 13].includes(m.codigoEstado),
-      );
+      return materias.filter((m) => ESTADOS_CURSANDO.has(m.codigoEstado));
     default:
       return materias;
   }
@@ -105,3 +82,19 @@ export function encontrarSemestreActual(
   );
   return conMasCursando.numero;
 }
+export const ESTADO_MATERIA_VARIANT: Record<number, "success" | "warning" | "neutral" | "error"> = {
+  0: "neutral",
+  1: "neutral",
+  2: "success",
+  3: "success",
+  4: "success",
+  5: "warning",
+  6: "warning",
+  7: "neutral",
+  8: "neutral",
+  9: "neutral",
+  10: "error",
+  11: "neutral",
+  12: "warning",
+  13: "neutral",
+};

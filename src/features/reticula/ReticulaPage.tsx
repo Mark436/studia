@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { Page } from "@/components/layout/Page";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TreeIcon } from "@/components/ui/icons";
 import type { Alumno } from "@/lib/api/client";
+import { useCapsuleSlideOut } from "@/lib/motion/useCapsuleSlideOut";
 import { useReticula } from "./hooks/useReticula";
 import { ReticulaCard } from "./components/ReticulaCard";
 import { FiltroDropdown } from "./components/FiltroDropdown";
@@ -16,23 +16,26 @@ const FILTRO_OPTIONS: readonly { value: FiltroReticula; label: string }[] = [
   { value: "cursando", label: "Cursando" },
 ] as const;
 
-export function ReticulaPage({ alumno }: { alumno: Alumno | null }) {
+export function ReticulaPage({
+  alumno,
+  capsuleExpanded = false,
+}: {
+  alumno: Alumno | null;
+  /** True while the persistent context capsule is expanded: the top row
+      slides off the right edge so the island has the stage. */
+  capsuleExpanded?: boolean;
+}) {
   const semestresReticula = alumno?.semestres;
   const semestreAlumno = alumno?.semestre ?? 1;
 
   const {
     semestres,
-    semestreActual,
     filtro,
     setFiltro,
     obtenerMateriasFiltradas,
   } = useReticula(semestresReticula, semestreAlumno);
 
-  const [activeSemestre, setActiveSemestre] = useState<number | null>(null);
-
-  const handleSemestreToggle = (numero: number) => {
-    setActiveSemestre((prev) => (prev === numero ? null : numero));
-  };
+  const topRowRef = useCapsuleSlideOut<HTMLDivElement>(capsuleExpanded);
 
   const totalMaterias = semestres.reduce((acc, s) => acc + s.total, 0);
   const totalAcreditadas = semestres.reduce((acc, s) => acc + s.acreditadas, 0);
@@ -53,15 +56,20 @@ export function ReticulaPage({ alumno }: { alumno: Alumno | null }) {
 
   return (
     <Page>
-      <div className="flex items-center justify-end gap-2 mb-4">
-        <Badge variant="neutral" className="text-xs">
-          {totalAcreditadas} / {totalMaterias} materias
-        </Badge>
-        <FiltroDropdown
-          value={filtro}
-          onChange={setFiltro}
-          options={FILTRO_OPTIONS}
-        />
+      <div className="relative mb-4 h-12 overflow-x-clip">
+        <div
+          ref={topRowRef}
+          className="absolute right-0 top-0 flex h-full items-center gap-2"
+        >
+          <Badge variant="neutral" className="text-xs">
+            {totalAcreditadas} / {totalMaterias} materias
+          </Badge>
+          <FiltroDropdown
+            value={filtro}
+            onChange={setFiltro}
+            options={FILTRO_OPTIONS}
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -71,8 +79,6 @@ export function ReticulaPage({ alumno }: { alumno: Alumno | null }) {
             <ReticulaCard
               key={semestre.numero}
               semestre={semestre}
-              isActive={activeSemestre === semestre.numero || semestreActual === semestre.numero}
-              onToggle={() => handleSemestreToggle(semestre.numero)}
               filtro={filtro}
               obtenerMateriasFiltradas={obtenerMateriasFiltradas}
               reticulaMap={alumno.reticulaMap}

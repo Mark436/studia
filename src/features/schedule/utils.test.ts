@@ -201,6 +201,21 @@ describe("shortenSubjectName", () => {
     expect(shortenSubjectName("Ingeniería en Sistemas Computacionales")).toBe("Ingeniería");
   });
 
+  it("drops connectors and keeps a hint of each meaningful word", () => {
+    expect(shortenSubjectName("Taller de Investigación")).toBe("Taller Inv");
+    expect(shortenSubjectName("Taller de Administración")).toBe("Taller Adm");
+    expect(shortenSubjectName("Cálculo Diferencial")).toBe("Cálculo Dif");
+    expect(shortenSubjectName("Bases de Datos")).toBe("Bases Datos");
+    expect(shortenSubjectName("Taller de Ética")).toBe("Taller Ética");
+  });
+
+  it("never leaves a connector as the surviving trailing word", () => {
+    expect(shortenSubjectName("Taller de Investigación")).not.toBe("Taller de");
+    expect(shortenSubjectName("Introducción a la Ingeniería")).toBe(
+      "Introducción",
+    );
+  });
+
   it("trims whitespace", () => {
     expect(shortenSubjectName("  Inglés  ")).toBe("Inglés");
   });

@@ -29,6 +29,9 @@ interface CapsuleProps {
       tween toward the new natural size) without expanding — used by the
       transient academic flash. */
   popKey?: string | number;
+  /** Notifies the owner when the island opens/closes. The owning screen can
+      use it to clear (or restore) space around the collapsed position. */
+  onExpandedChange?: (expanded: boolean) => void;
   /** Delay before an expanded capsule collapses back (ms), manual or pulsed. */
   autoCollapseMs?: number;
   /** 0–100: when provided, draws a thin progress border on the capsule edge
@@ -133,6 +136,7 @@ export function Capsule({
   expanded,
   pulseKey,
   popKey,
+  onExpandedChange,
   autoCollapseMs = 1500,
   progressPercent,
   tone = "neutral",
@@ -198,6 +202,15 @@ export function Capsule({
   }, [autoCollapseMs, isExpanded]);
 
   useEffect(() => clearCollapseTimer, []);
+
+  // Broadcast the open/close state so the owning screen can shift content
+  // around the collapsed position (e.g. the schedule day nav slides right
+  // while the island rests at the left, and off-screen when it expands). Runs
+  // in a layout effect so the owner's sync tween starts in the same frame as
+  // the island morph, reading as one gesture.
+  useLayoutEffect(() => {
+    onExpandedChange?.(isExpanded);
+  }, [isExpanded, onExpandedChange]);
 
   // Dismiss on outside press.
   useEffect(() => {

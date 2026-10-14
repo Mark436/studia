@@ -6,6 +6,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import type { ToastVariant } from "@/components/ui/toastVariants";
 import { useCurrentTime } from "@/lib/devtools/useCurrentTime";
 import { useClock } from "@/lib/devtest/provider";
+import { useCapsuleSlideOut } from "@/lib/motion/useCapsuleSlideOut";
 import type { Alumno } from "@/lib/api/client";
 import { CUSTOM_CLAVE_PREFIX } from "@/lib/storage/scheduleEditsStore";
 import type { EditedField } from "@/lib/storage/scheduleEditsStore";
@@ -38,6 +39,9 @@ interface SchedulePageProps {
   longPressDurationMs?: number;
   /** True while dev simulation feeds the screens: drift detection pauses. */
   simulated?: boolean;
+  /** True while the persistent context capsule is expanded: the day nav
+      slides off the right edge so the island has the stage. */
+  capsuleExpanded?: boolean;
   onShowToast?: (message: string, variant: ToastVariant) => void;
 }
 
@@ -50,6 +54,7 @@ export function SchedulePage({
   alumno,
   longPressDurationMs,
   simulated = false,
+  capsuleExpanded = false,
   onShowToast,
 }: SchedulePageProps) {
   const now = useCurrentTime();
@@ -70,6 +75,10 @@ export function SchedulePage({
   const isToday = isSameDay(selectedDate, now);
 
   const { loaded: editsLoaded, edits } = scheduleEdits;
+
+  // Day-nav slide, synced to the capsule morph: when the island expands, the
+  // nav row slides out past the right edge; when it collapses, it slides back.
+  const navRowRef = useCapsuleSlideOut<HTMLDivElement>(capsuleExpanded);
 
   // Manual-edit drift: after each real fetch, compare the fresh raw values
   // against the stored baseline. School changes colliding with a live manual
@@ -178,33 +187,38 @@ export function SchedulePage({
           </div>
         ) : (
           <>
-            <div className="mb-4 flex items-center justify-center gap-5">
-              <DayDots
-                selectedDate={selectedDate}
-                now={now}
-                onSelectDate={setSelectedDate}
-              />
-              <button
-                type="button"
-                onClick={
-                  isToday
-                    ? () => setEditor({ mode: "create" })
-                    : () => setSelectedDate(clock.getNow())
-                }
-                aria-label={isToday ? "Agregar materia" : "Volver a hoy"}
-                title={isToday ? "Agregar materia" : "Volver a hoy"}
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
-                  isToday
-                    ? "bg-primary-container text-on-primary-container hover:bg-primary-container/70"
-                    : "bg-transparent font-semibold text-primary hover:bg-primary-container/50"
-                }`}
+            <div className="relative mb-4 h-12 overflow-x-clip">
+              <div
+                ref={navRowRef}
+                className="absolute right-0 top-0 flex items-center gap-5"
               >
-                {isToday ? (
-                  <PlusIcon size={20} />
-                ) : (
-                  <span className="text-xs">Hoy</span>
-                )}
-              </button>
+                <DayDots
+                  selectedDate={selectedDate}
+                  now={now}
+                  onSelectDate={setSelectedDate}
+                />
+                <button
+                  type="button"
+                  onClick={
+                    isToday
+                      ? () => setEditor({ mode: "create" })
+                      : () => setSelectedDate(clock.getNow())
+                  }
+                  aria-label={isToday ? "Agregar materia" : "Volver a hoy"}
+                  title={isToday ? "Agregar materia" : "Volver a hoy"}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
+                    isToday
+                      ? "bg-primary-container text-on-primary-container hover:bg-primary-container/70"
+                      : "bg-transparent font-semibold text-primary hover:bg-primary-container/50"
+                  }`}
+                >
+                  {isToday ? (
+                    <PlusIcon size={20} />
+                  ) : (
+                    <span className="text-xs">Hoy</span>
+                  )}
+                </button>
+              </div>
             </div>
             <div {...swipe.bind} className="touch-pan-y flex flex-1 flex-col">
               <ScheduleDayView

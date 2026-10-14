@@ -37,7 +37,8 @@ Minimizado:
 - Línea 1: contador de horas/minutos + **salón a la derecha de los números**
   (crudo, sin prefijo).
 - Línea 2: **materia en texto chico resumida** (`shortenSubjectName`, umbral
-  12 caracteres) que nunca envuelve. Al expandir el nombre se acompleta en una
+  12 caracteres) que nunca envuelve: descarta conectores y abrevia las palabras
+  siguientes ("Taller de Investigación" → "Taller Inv"). Al expandir el nombre se acompleta en una
   sola línea sin salto, revelado por el overflow-hidden conforme la cápsula crece.
 
 Expandido (`stacked`):
