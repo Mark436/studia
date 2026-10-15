@@ -505,11 +505,13 @@ function AuthenticatedShell() {
         }
       >
         {/* Adeudo alerts opt-in: centered modal-like overlay */}
-        <div className="fixed inset-x-0 top-1/2 -translate-y-1/2 z-50 mx-auto w-full max-w-md px-4 pointer-events-none">
-          <div className="pointer-events-auto">
-            <AdeudoAlertsCard alumno={effectiveAlumno} />
+        {!demo && (
+          <div className="fixed inset-x-0 top-1/2 -translate-y-1/2 z-50 mx-auto w-full max-w-md px-4 pointer-events-none">
+            <div className="pointer-events-auto">
+              <AdeudoAlertsCard alumno={effectiveAlumno} />
+            </div>
           </div>
-        </div>
+        )}
         <PageTransition transitionKey={tab}>
           {(activeKey) =>
             activeKey === "schedule" ? (
