@@ -593,3 +593,30 @@ Catálogo central de **eventos, disparadores y cadencias**: [`docs/sugerir-horar
   (`avisoTurnosEnviado`) y el nudge de refrescar lo menciona al sugerir
   actualizar datos. No existe un archivo «SIG»: la detección del calendario es
   por la **página oficial** (`calendario-escolar.html`) durante las vacaciones.
+
+## 18. Demostración (`?demo`)
+
+Recorrido ficticio, autocontenido y efímero para mostrar la app sin usar datos
+reales ni escribir en el backend.
+
+- [x] Entrada por query `?demo` (`src/demo/demoMode.ts`); `main.tsx` importa
+  `src/demo/startDemo.ts` de forma dinámica y omite el registro del service
+  worker, así que un recargo siempre empieza de cero.
+- [x] Datos inventados (`src/demo/data.ts`): 6 materias (4 calificadas, 2
+  pendientes), avisos, alumno y una retícula pequeña; el salón es literalmente
+  «Demo».
+- [x] Backend de almacenamiento en memoria, aditivo (`enableInMemoryStorage` en
+  `src/lib/storage/db.ts`); la ruta de IndexedDB queda intacta.
+- [x] Arranque por el entorno de prueba existente: modo mock, snapshot simulado,
+  caché sembrada y reloj fijado a un día hábil en horario de clases, de modo que
+  la sesión se restaura sin red y la cápsula se ve viva.
+- [x] Guía automática (`src/demo/DemoGuide.tsx`, carga diferida): toast de
+  bienvenida al entrar, flash de cápsula al abrir Calificaciones y toast al
+  volver a Horario. Reutiliza los primitivos existentes; no toca cápsula,
+  toasts ni notificaciones.
+- [x] Pull-to-refresh y cierre de sesión en modo demo solo muestran un toast
+  (sin abrir el modal de re-autenticación) y el cierre recarga la página.
+- [x] Código de demo fuera del bundle real: `startDemo` y `DemoGuide` se emiten
+  como chunks aparte y solo se cargan con `?demo`.
+- [x] Pruebas del backend en memoria, de la forma de los datos y del reloj de
+  demo (`src/demo/demo.test.ts`).

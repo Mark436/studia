@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import gsap from "gsap";
 import { PILL_SLIDE_DURATION, PILL_SLIDE_EASE } from "@/lib/motion/eases";
@@ -19,6 +19,17 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+// Tuning for the active pill's liquid-glass surface (`<glass-element>`, see
+// public/glass). Width/height/radius are derived from the measured button.
+const GLASS_ATTRIBUTES = {
+  depth: "5",
+  blur: "1",
+  strength: "40",
+  "chromatic-aberration": "2",
+  "background-color":
+    "color-mix(in oklab, var(--studia-cobalto) 12%, transparent)",
+} as const;
+
 // Floating glass pill: the navigation reads as one object hovering over the
 // content instead of a full-width bar bolted to the viewport edge. The active
 // tab is a sliding foreground pill that glides between positions with a subtle
@@ -31,7 +42,9 @@ export function BottomNavigation<T extends string>({
 }: BottomNavigationProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLSpanElement>(null);
+  const glassRef = useRef<HTMLElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [pillSize, setPillSize] = useState({ width: 0, height: 0 });
   const activeIndex = items.findIndex((item) => item.id === activeId);
 
   // Position the indicator exactly over the active button. Called on every
@@ -44,7 +57,12 @@ export function BottomNavigation<T extends string>({
 
     const left = button.offsetLeft;
     const width = button.offsetWidth;
-    indicator.style.width = `${width}px`;
+    const height = button.offsetHeight;
+    setPillSize((current) =>
+      current.width === width && current.height === height
+        ? current
+        : { width, height },
+    );
 
     if (animate && !prefersReducedMotion()) {
       gsap.to(indicator, {
@@ -84,17 +102,39 @@ export function BottomNavigation<T extends string>({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resize/fonts only.
   }, []);
 
+  // Feed the measured pill geometry to the glass web component. Attributes are
+  // set imperatively: React assigns custom-element props as DOM properties, and
+  // `<glass-element>` exposes read-only getters for width/height/depth/… which
+  // would throw on assignment.
+  useLayoutEffect(() => {
+    const glass = glassRef.current;
+    if (glass === null || pillSize.width === 0) return;
+
+    glass.setAttribute("width", String(pillSize.width));
+    glass.setAttribute("height", String(pillSize.height));
+    glass.setAttribute("radius", String(Math.round(pillSize.height / 2)));
+    for (const [name, value] of Object.entries(GLASS_ATTRIBUTES)) {
+      glass.setAttribute(name, value);
+    }
+  }, [pillSize]);
+
   return (
     <nav
       aria-label="Navegación principal"
       className="pointer-events-none flex justify-center pb-[max(env(safe-area-inset-bottom),10px)]"
     >
-      <div className="glass-panel elevated pointer-events-auto relative mx-4 flex w-full max-w-sm items-center gap-1 rounded-full p-1.5">
+      <div
+        ref={containerRef}
+        className="glass-panel elevated pointer-events-auto relative mx-4 flex w-full max-w-sm items-center gap-1 rounded-full p-1.5"
+      >
         <span
           ref={indicatorRef}
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-1.5 left-0 rounded-full bg-primary-container ring-1 ring-primary/20"
-        />
+          className="pointer-events-none absolute inset-y-1.5 left-0"
+          style={{ width: pillSize.width > 0 ? pillSize.width : undefined }}
+        >
+          <glass-element ref={glassRef} />
+        </span>
         {items.map((item, index) => {
           const isActive = item.id === activeId;
 

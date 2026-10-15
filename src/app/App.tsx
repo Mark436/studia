@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { PageTransition } from "@/components/layout/PageTransition";
@@ -61,6 +61,15 @@ import { formatProgressDelta } from "@/lib/notifications/progress";
 import { getHomeTab, NAV_ITEMS } from "./navigation";
 import type { TabId } from "./navigation";
 import { DevTestProvider } from "@/lib/devtest/provider";
+import { isDemoMode } from "@/demo/demoMode";
+
+// The `?demo` guide is code-split so it never loads (nor ships in the initial
+// bundle) for the real app; it only lazily resolves when demo mode is active.
+const DemoGuide = lazy(() =>
+  import("@/demo/DemoGuide").then((module) => ({
+    default: module.DemoGuide,
+  })),
+);
 
 // A session older than this gets one gentle reminder per day suggesting a
 // pull-to-refresh; the re-auth sheet itself only appears on demand.
@@ -136,6 +145,7 @@ function AuthenticatedShell() {
     logout,
   } = useAuth();
   const dev = useDevConfig();
+  const demo = isDemoMode();
   const [tab, setTab] = useState<TabId>(() =>
     getHomeTab(shouldOpenGradesFirst(alumno, unseenGradeChanges)),
   );
@@ -161,11 +171,14 @@ function AuthenticatedShell() {
     longPressDurationMs,
   } = settingsCtrl.settings;
 
-  // Dev-only toast test duration: applies only while the panel is enabled.
+  // Toast duration: demo gets a longer, readable duration.
   const devActive = dev.loaded && dev.enabled;
+  const DEMO_TOAST_DURATION_MS = 4000;
   const toastDurationMs = devActive
     ? dev.config.toastDurationMs
-    : DEFAULT_TOAST_DURATION_MS;
+    : demo
+      ? DEMO_TOAST_DURATION_MS
+      : DEFAULT_TOAST_DURATION_MS;
 
   const showToast = useCallback((message: string, variant: ToastVariant) => {
     toastIdRef.current += 1;
@@ -417,9 +430,26 @@ function AuthenticatedShell() {
   ]);
 
   function handlePullToRefresh() {
+    // Demo data lives only in memory: there is nothing to re-fetch, so a pull
+    // just acknowledges the gesture instead of opening the re-auth sheet.
+    if (demo) {
+      showToast("Información actualizada correctamente.", "success");
+      return;
+    }
     if (hasCredentials) return refresh();
     setReAuthOpen(true);
   }
+
+  const handleLogout = useCallback(() => {
+    // Without real credentials there is no session to close; acknowledge and
+    // reload back into the demo's clean slate.
+    if (demo) {
+      showToast("Cerrando sesión…", "neutral");
+      window.setTimeout(() => window.location.reload(), 900);
+      return;
+    }
+    logout();
+  }, [demo, logout, showToast]);
 
   // The capsule flash is transient (never eternal): it clears itself after
   // CAPSULE_FLASH_LIFETIME_MS so the capsule returns to the schedule context
@@ -474,15 +504,19 @@ function AuthenticatedShell() {
           />
         }
       >
-        <AdeudoAlertsCard alumno={effectiveAlumno} />
-
+        {/* Adeudo alerts opt-in: centered modal-like overlay */}
+        <div className="fixed inset-x-0 top-1/2 -translate-y-1/2 z-50 mx-auto w-full max-w-md px-4 pointer-events-none">
+          <div className="pointer-events-auto">
+            <AdeudoAlertsCard alumno={effectiveAlumno} />
+          </div>
+        </div>
         <PageTransition transitionKey={tab}>
           {(activeKey) =>
             activeKey === "schedule" ? (
               <SchedulePage
                 alumno={effectiveAlumno}
                 longPressDurationMs={longPressDurationMs}
-                simulated={devActive}
+                simulated={devActive && !demo}
                 capsuleExpanded={capsuleExpanded}
                 onShowToast={showToast}
               />
@@ -500,13 +534,23 @@ function AuthenticatedShell() {
                 onShowToast={showToast}
                 onSendTestNotification={sendTestNotification}
                 onOpenSettings={() => setSettingsOpen(true)}
-                onLogout={logout}
-                dev={dev}
+                onLogout={handleLogout}
+                dev={demo ? undefined : dev}
               />
             )
           }
         </PageTransition>
       </AppShell>
+
+      {demo ? (
+        <Suspense fallback={null}>
+          <DemoGuide
+            tab={tab}
+            onToast={showToast}
+            onCapsule={setCapsuleNotification}
+          />
+        </Suspense>
+      ) : null}
 
       {toast ? (
         <Toast

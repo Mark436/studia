@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { DevTestEnvironment } from "@/lib/devtest/environment";
+import { isDemoMode } from "@/demo/demoMode";
 import {
   getSetting,
   removeSetting,
@@ -94,9 +95,9 @@ export function useDevConfig(): DevToolsController {
 
       const parsed = parseDevConfig(raw);
       setConfig(parsed);
-      // Unset resolves per build type: dev builds show the panel, production
-      // keeps it hidden until the tap gesture enables it.
-      const shouldEnable = enabledRaw === null ? isDevBuild() : enabledRaw === "true";
+      // Unset resolves per build type: dev builds show the panel by default,
+      // but in demo mode the panel stays hidden (can still be unlocked).
+      const shouldEnable = enabledRaw === null ? isDevBuild() && !isDemoMode() : enabledRaw === "true";
       setEnabled(shouldEnable);
       if (shouldEnable) {
         env.activate();

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { TopZoneProvider } from "./TopZone";
+import { APP_COLUMN_MAX_WIDTH } from "./appColumn";
 import { usePullToRefresh } from "./usePullToRefresh";
 
 const TRIGGER_THRESHOLD_PX = 64;
@@ -41,7 +42,9 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh bg-background">
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col">
+      <div
+        className={`relative mx-auto flex min-h-dvh w-full ${APP_COLUMN_MAX_WIDTH} flex-col`}
+      >
         {/* Reserved island space: a constant height keeps the layout stable
             while the capsule expands over the content. Screens whose top row
             sits beside the island use "none" (safe area only). */}
