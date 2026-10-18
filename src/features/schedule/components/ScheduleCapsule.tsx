@@ -201,7 +201,7 @@ export function ScheduleCapsule({
 
   // "Por hoy terminaste" y "Sin clases hoy" ahora se cuentan igual: no hay
   // clase por delante hoy, así que la cápsula mira la próxima clase futura
-  // ("mañana HH:MM" o "nos vemos el {día}"). Sin clases restantes en la
+  // ("mañana HH:MM" o "hasta el {día}"). Sin clases restantes en la
   // semana, queda el mensaje calmado y la app sigue funcionando.
   if (state.kind === "empty" || state.kind === "done") {
     const info = nextClassInfo;
@@ -215,7 +215,7 @@ export function ScheduleCapsule({
         ? "Consulta otro día desde tu horario."
         : isTomorrow
           ? `Mañana ${info.startsLabel}`
-          : `Nos vemos el ${dayName}`;
+          : `hasta el ${dayName}`;
     return (
 <Capsule
           autoCollapseMs={autoCollapseMs}
@@ -233,7 +233,7 @@ export function ScheduleCapsule({
             </span>
           ) : (
             <span className={SUBJECT_PRIORITY_CLASS}>
-              {isTomorrow ? `mañana ${info.startsLabel}` : `nos vemos el ${dayName}`}
+              {isTomorrow ? `mañana ${info.startsLabel}` : `hasta el ${dayName}`}
             </span>
           )
         }
